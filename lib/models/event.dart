@@ -18,15 +18,32 @@ class Event {
   final DateTime startEarliest;
   final DateTime startLatest;
 
-  Event({
-    String? id,
+  Event._({
+    required this.id,
     required this.type,
     this.customName,
+    required this.startEarliest,
+    required this.startLatest,
+  });
+
+  factory Event({
+    String? id,
+    required EventType type,
+    String? customName,
     DateTime? startEarliest,
     DateTime? startLatest,
-  })  : id = id ?? const Uuid().v4(),
-        startEarliest = startEarliest ?? DateTime.now().toUtc(),
-        startLatest = startLatest ?? startEarliest ?? DateTime.now().toUtc();
+  }) {
+    final now = DateTime.now().toUtc();
+    final earliest = startEarliest ?? now;
+    final latest = startLatest ?? earliest;
+    return Event._(
+      id: id ?? const Uuid().v4(),
+      type: type,
+      customName: customName,
+      startEarliest: earliest,
+      startLatest: latest,
+    );
+  }
 
   Event copyWith({
     EventType? type,
@@ -34,7 +51,7 @@ class Event {
     DateTime? startEarliest,
     DateTime? startLatest,
   }) {
-    return Event(
+    return Event._(
       id: id,
       type: type ?? this.type,
       customName: customName ?? this.customName,
@@ -57,7 +74,7 @@ class Event {
     // Handle migration from old single startTime format
     if (map.containsKey('startTime') && !map.containsKey('startEarliest')) {
       final startTime = DateTime.parse(map['startTime']);
-      return Event(
+      return Event._(
         id: map['id'],
         type: EventType.values.byName(map['type']),
         customName: map['customName'],
@@ -65,7 +82,7 @@ class Event {
         startLatest: startTime,
       );
     }
-    return Event(
+    return Event._(
       id: map['id'],
       type: EventType.values.byName(map['type']),
       customName: map['customName'],
