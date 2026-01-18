@@ -92,9 +92,17 @@ Instead of using GitHub Actions, you can use Vercel's native GitHub integration:
    - Deploy on every push to main
    - Create preview deployments for PRs
    - Comment preview URLs on PRs
-3. This approach requires adding a custom `installCommand` to `vercel.json` to install Flutter
+3. **Important**: Native Vercel deployments require Flutter to be available in Vercel's build environment. Since Vercel doesn't provide Flutter by default, you would need to:
+   - Use a custom Docker image with Flutter pre-installed, OR
+   - Add a complex `installCommand` to install Flutter during build (slow and unreliable)
 
-The GitHub Actions approach (described above) gives more control over the build process and is recommended for this project.
+**The GitHub Actions approach (described above) is strongly recommended** because:
+- Flutter is already available in GitHub Actions runners
+- Faster builds with Flutter caching
+- More control over the build process
+- More reliable than installing Flutter during each Vercel build
+
+The current `vercel.json` configuration works with the GitHub Actions workflow and does not include an `installCommand` for this reason.
 
 ## Notes
 
