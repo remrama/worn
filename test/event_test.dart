@@ -9,7 +9,9 @@ void main() {
       expect(event.type, EventType.walk);
       expect(event.customName, isNull);
       expect(event.id, isNotEmpty);
-      expect(event.startTime, isNotNull);
+      expect(event.startEarliest, isNotNull);
+      expect(event.startLatest, isNotNull);
+      expect(event.startEarliest, event.startLatest);
     });
 
     test('creates with custom name for other type', () {
@@ -19,27 +21,57 @@ void main() {
       expect(event.customName, 'Yoga');
     });
 
+    test('creates with time window for retroactive events', () {
+      final earliest = DateTime.utc(2024, 1, 15, 10, 0);
+      final latest = DateTime.utc(2024, 1, 15, 10, 30);
+      final event = Event(
+        type: EventType.inBed,
+        startEarliest: earliest,
+        startLatest: latest,
+      );
+
+      expect(event.startEarliest, earliest);
+      expect(event.startLatest, latest);
+      expect(event.hasStartWindow, true);
+    });
+
+    test('hasStartWindow is false when times are equal', () {
+      final time = DateTime.utc(2024, 1, 15, 10, 0);
+      final event = Event(
+        type: EventType.walk,
+        startEarliest: time,
+        startLatest: time,
+      );
+
+      expect(event.hasStartWindow, false);
+    });
+
     test('copyWith preserves unchanged fields', () {
-      final startTime = DateTime.utc(2024, 1, 15, 10, 30);
+      final startEarliest = DateTime.utc(2024, 1, 15, 10, 0);
+      final startLatest = DateTime.utc(2024, 1, 15, 10, 30);
       final event = Event(
         type: EventType.workout,
         customName: null,
-        startTime: startTime,
+        startEarliest: startEarliest,
+        startLatest: startLatest,
       );
 
       final updated = event.copyWith(type: EventType.run);
 
       expect(updated.id, event.id);
       expect(updated.type, EventType.run);
-      expect(updated.startTime, startTime);
+      expect(updated.startEarliest, startEarliest);
+      expect(updated.startLatest, startLatest);
     });
 
     test('toMap and fromMap roundtrip', () {
-      final startTime = DateTime.utc(2024, 1, 15, 10, 30);
+      final startEarliest = DateTime.utc(2024, 1, 15, 10, 0);
+      final startLatest = DateTime.utc(2024, 1, 15, 10, 30);
       final event = Event(
         type: EventType.swim,
         customName: null,
-        startTime: startTime,
+        startEarliest: startEarliest,
+        startLatest: startLatest,
       );
 
       final map = event.toMap();
@@ -48,7 +80,8 @@ void main() {
       expect(restored.id, event.id);
       expect(restored.type, event.type);
       expect(restored.customName, event.customName);
-      expect(restored.startTime, event.startTime);
+      expect(restored.startEarliest, event.startEarliest);
+      expect(restored.startLatest, event.startLatest);
     });
 
     test('toMap and fromMap roundtrip with custom name', () {
@@ -63,6 +96,23 @@ void main() {
       expect(restored.id, event.id);
       expect(restored.type, EventType.other);
       expect(restored.customName, 'Meditation');
+    });
+
+    test('fromMap handles migration from old single startTime format', () {
+      final oldMap = {
+        'id': 'test-id',
+        'type': 'walk',
+        'customName': null,
+        'startTime': '2024-01-15T10:30:00.000Z',
+      };
+
+      final event = Event.fromMap(oldMap);
+
+      expect(event.id, 'test-id');
+      expect(event.type, EventType.walk);
+      expect(event.startEarliest, DateTime.utc(2024, 1, 15, 10, 30));
+      expect(event.startLatest, DateTime.utc(2024, 1, 15, 10, 30));
+      expect(event.hasStartWindow, false);
     });
 
     test('displayName returns label for standard types', () {

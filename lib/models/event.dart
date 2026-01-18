@@ -15,26 +15,31 @@ class Event {
   final String id;
   final EventType type;
   final String? customName;
-  final DateTime startTime;
+  final DateTime startEarliest;
+  final DateTime startLatest;
 
   Event({
     String? id,
     required this.type,
     this.customName,
-    DateTime? startTime,
+    DateTime? startEarliest,
+    DateTime? startLatest,
   })  : id = id ?? const Uuid().v4(),
-        startTime = startTime ?? DateTime.now().toUtc();
+        startEarliest = startEarliest ?? DateTime.now().toUtc(),
+        startLatest = startLatest ?? startEarliest ?? DateTime.now().toUtc();
 
   Event copyWith({
     EventType? type,
     String? customName,
-    DateTime? startTime,
+    DateTime? startEarliest,
+    DateTime? startLatest,
   }) {
     return Event(
       id: id,
       type: type ?? this.type,
       customName: customName ?? this.customName,
-      startTime: startTime ?? this.startTime,
+      startEarliest: startEarliest ?? this.startEarliest,
+      startLatest: startLatest ?? this.startLatest,
     );
   }
 
@@ -43,16 +48,29 @@ class Event {
       'id': id,
       'type': type.name,
       'customName': customName,
-      'startTime': startTime.toIso8601String(),
+      'startEarliest': startEarliest.toIso8601String(),
+      'startLatest': startLatest.toIso8601String(),
     };
   }
 
   factory Event.fromMap(Map<String, dynamic> map) {
+    // Handle migration from old single startTime format
+    if (map.containsKey('startTime') && !map.containsKey('startEarliest')) {
+      final startTime = DateTime.parse(map['startTime']);
+      return Event(
+        id: map['id'],
+        type: EventType.values.byName(map['type']),
+        customName: map['customName'],
+        startEarliest: startTime,
+        startLatest: startTime,
+      );
+    }
     return Event(
       id: map['id'],
       type: EventType.values.byName(map['type']),
       customName: map['customName'],
-      startTime: DateTime.parse(map['startTime']),
+      startEarliest: DateTime.parse(map['startEarliest']),
+      startLatest: DateTime.parse(map['startLatest']),
     );
   }
 
@@ -62,6 +80,8 @@ class Event {
     }
     return labelFor(type);
   }
+
+  bool get hasStartWindow => startEarliest != startLatest;
 
   static String labelFor(EventType type) {
     switch (type) {
