@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'screens/devices_screen.dart';
 import 'screens/history_screen.dart';
 
@@ -38,9 +39,22 @@ class _MainScreenState extends State<MainScreen> {
     HistoryScreen(),
   ];
 
+  void _openGitHub() {
+    launchUrl(Uri.parse('https://github.com/remrama/worn/issues'));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.code),
+            onPressed: _openGitHub,
+            tooltip: 'GitHub',
+          ),
+        ],
+      ),
       body: _screens[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,

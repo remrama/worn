@@ -71,13 +71,28 @@ class _DevicesScreenState extends State<DevicesScreen> {
     }
   }
 
-  Future<void> _cycleStatus(Device device) async {
-    final oldStatus = device.status;
-    final newStatus = DeviceStatus.values[(device.status.index + 1) % DeviceStatus.values.length];
-    final updated = device.copyWith(status: newStatus);
-    await DeviceStore.instance.updateDevice(updated);
-    await LogService.instance.logStatusChanged(device, oldStatus, newStatus);
-    _load();
+  Future<void> _changeLocation(Device device) async {
+    final newLocation = await showDialog<DeviceLocation>(
+      context: context,
+      builder: (ctx) => LocationPickerDialog(currentLocation: device.location),
+    );
+    if (newLocation != null && newLocation != device.location) {
+      final oldLocation = device.location;
+      final updated = device.copyWith(location: newLocation);
+      await DeviceStore.instance.updateDevice(updated);
+      await LogService.instance.logLocationChanged(device, oldLocation, newLocation);
+      _load();
+    }
+  }
+
+  Future<void> _addNote() async {
+    final note = await showDialog<String>(
+      context: context,
+      builder: (ctx) => const NoteDialog(),
+    );
+    if (note != null && note.trim().isNotEmpty) {
+      await LogService.instance.logNote(note.trim());
+    }
   }
 
   @override
@@ -94,13 +109,11 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     final d = _devices[i];
                     return ListTile(
                       title: Text(d.name),
-                      subtitle: Text(
-                        '${Device.placementLabel(d.placement)}${d.serialNumber != null ? " | SN: ${d.serialNumber}" : ""}',
-                      ),
+                      subtitle: d.serialNumber != null ? Text('SN: ${d.serialNumber}') : null,
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          _statusChip(d),
+                          _locationChip(d),
                           IconButton(
                             icon: const Icon(Icons.edit, size: 20),
                             onPressed: () => _editDevice(d),
@@ -114,30 +127,38 @@ class _DevicesScreenState extends State<DevicesScreen> {
                     );
                   },
                 ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addDevice,
-        child: const Icon(Icons.add),
+      floatingActionButton: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          FloatingActionButton.small(
+            heroTag: 'note',
+            onPressed: _addNote,
+            child: const Icon(Icons.note_add),
+          ),
+          const SizedBox(height: 8),
+          FloatingActionButton(
+            heroTag: 'device',
+            onPressed: _addDevice,
+            child: const Icon(Icons.add),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _statusChip(Device d) {
+  Widget _locationChip(Device d) {
     Color color;
-    switch (d.status) {
-      case DeviceStatus.worn:
-        color = Colors.green;
-        break;
-      case DeviceStatus.loose:
-        color = Colors.grey;
-        break;
-      case DeviceStatus.charging:
-        color = Colors.orange;
-        break;
+    if (d.location == DeviceLocation.loose) {
+      color = Colors.grey;
+    } else if (d.location == DeviceLocation.charging) {
+      color = Colors.orange;
+    } else {
+      color = Colors.green; // Worn on body
     }
     return GestureDetector(
-      onTap: () => _cycleStatus(d),
+      onTap: () => _changeLocation(d),
       child: Chip(
-        label: Text(Device.statusLabel(d.status), style: const TextStyle(fontSize: 12)),
+        label: Text(Device.locationLabel(d.location), style: const TextStyle(fontSize: 12)),
         backgroundColor: color.withValues(alpha: 0.2),
         side: BorderSide(color: color),
         padding: EdgeInsets.zero,
@@ -158,7 +179,6 @@ class DeviceDialog extends StatefulWidget {
 class _DeviceDialogState extends State<DeviceDialog> {
   final _nameController = TextEditingController();
   final _snController = TextEditingController();
-  Placement _placement = Placement.leftWrist;
 
   @override
   void initState() {
@@ -166,7 +186,6 @@ class _DeviceDialogState extends State<DeviceDialog> {
     if (widget.device != null) {
       _nameController.text = widget.device!.name;
       _snController.text = widget.device!.serialNumber ?? '';
-      _placement = widget.device!.placement;
     }
   }
 
@@ -184,9 +203,8 @@ class _DeviceDialogState extends State<DeviceDialog> {
     final device = Device(
       id: widget.device?.id,
       name: name,
-      placement: _placement,
+      location: widget.device?.location ?? DeviceLocation.loose,
       serialNumber: sn.isEmpty ? null : sn,
-      status: widget.device?.status ?? DeviceStatus.loose,
     );
     Navigator.pop(context, device);
   }
@@ -206,15 +224,6 @@ class _DeviceDialogState extends State<DeviceDialog> {
               autofocus: true,
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<Placement>(
-              initialValue: _placement,
-              decoration: const InputDecoration(labelText: 'Placement'),
-              items: Placement.values
-                  .map((p) => DropdownMenuItem(value: p, child: Text(Device.placementLabel(p))))
-                  .toList(),
-              onChanged: (v) => setState(() => _placement = v!),
-            ),
-            const SizedBox(height: 12),
             TextField(
               controller: _snController,
               decoration: const InputDecoration(labelText: 'Serial Number (optional)'),
@@ -225,6 +234,77 @@ class _DeviceDialogState extends State<DeviceDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         TextButton(onPressed: _submit, child: Text(isEdit ? 'Save' : 'Add')),
+      ],
+    );
+  }
+}
+
+class LocationPickerDialog extends StatelessWidget {
+  final DeviceLocation currentLocation;
+  const LocationPickerDialog({super.key, required this.currentLocation});
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Set Location'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: ListView.builder(
+          shrinkWrap: true,
+          itemCount: DeviceLocation.values.length,
+          itemBuilder: (ctx, i) {
+            final loc = DeviceLocation.values[i];
+            final isSelected = loc == currentLocation;
+            return ListTile(
+              title: Text(Device.locationLabel(loc)),
+              leading: isSelected ? const Icon(Icons.check, color: Colors.green) : null,
+              onTap: () => Navigator.pop(context, loc),
+            );
+          },
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      ],
+    );
+  }
+}
+
+class NoteDialog extends StatefulWidget {
+  const NoteDialog({super.key});
+
+  @override
+  State<NoteDialog> createState() => _NoteDialogState();
+}
+
+class _NoteDialogState extends State<NoteDialog> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    Navigator.pop(context, _controller.text);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Add Note'),
+      content: TextField(
+        controller: _controller,
+        decoration: const InputDecoration(hintText: 'Enter your note...'),
+        autofocus: true,
+        maxLines: 3,
+        textInputAction: TextInputAction.done,
+        onSubmitted: (_) => _submit(),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(onPressed: _submit, child: const Text('Save')),
       ],
     );
   }

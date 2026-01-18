@@ -3,15 +3,11 @@ import 'package:worn/models/device.dart';
 
 void main() {
   group('Device model', () {
-    test('creates with required fields', () {
-      final device = Device(
-        name: 'Test Device',
-        placement: Placement.leftWrist,
-      );
+    test('creates with required fields and defaults to loose', () {
+      final device = Device(name: 'Test Device');
 
       expect(device.name, 'Test Device');
-      expect(device.placement, Placement.leftWrist);
-      expect(device.status, DeviceStatus.loose);
+      expect(device.location, DeviceLocation.loose);
       expect(device.serialNumber, isNull);
       expect(device.id, isNotEmpty);
     });
@@ -19,40 +15,35 @@ void main() {
     test('creates with all fields', () {
       final device = Device(
         name: 'Full Device',
-        placement: Placement.rightWrist,
+        location: DeviceLocation.rightWrist,
         serialNumber: 'SN123',
-        status: DeviceStatus.worn,
       );
 
       expect(device.name, 'Full Device');
-      expect(device.placement, Placement.rightWrist);
+      expect(device.location, DeviceLocation.rightWrist);
       expect(device.serialNumber, 'SN123');
-      expect(device.status, DeviceStatus.worn);
     });
 
     test('copyWith preserves unchanged fields', () {
       final device = Device(
         name: 'Original',
-        placement: Placement.leftWrist,
+        location: DeviceLocation.leftWrist,
         serialNumber: 'SN123',
-        status: DeviceStatus.loose,
       );
 
-      final updated = device.copyWith(status: DeviceStatus.worn);
+      final updated = device.copyWith(location: DeviceLocation.charging);
 
       expect(updated.id, device.id);
       expect(updated.name, 'Original');
-      expect(updated.placement, Placement.leftWrist);
+      expect(updated.location, DeviceLocation.charging);
       expect(updated.serialNumber, 'SN123');
-      expect(updated.status, DeviceStatus.worn);
     });
 
     test('toMap and fromMap roundtrip', () {
       final device = Device(
         name: 'Roundtrip',
-        placement: Placement.finger,
+        location: DeviceLocation.finger,
         serialNumber: 'ABC',
-        status: DeviceStatus.charging,
       );
 
       final map = device.toMap();
@@ -60,21 +51,59 @@ void main() {
 
       expect(restored.id, device.id);
       expect(restored.name, device.name);
-      expect(restored.placement, device.placement);
+      expect(restored.location, device.location);
       expect(restored.serialNumber, device.serialNumber);
-      expect(restored.status, device.status);
     });
 
-    test('placement labels are readable', () {
-      expect(Device.placementLabel(Placement.leftWrist), 'Left Wrist');
-      expect(Device.placementLabel(Placement.rightAnkle), 'Right Ankle');
-      expect(Device.placementLabel(Placement.finger), 'Finger');
+    test('fromMap handles old format migration', () {
+      // Old format: loose status
+      final looseMap = {
+        'id': 'test-id-1',
+        'name': 'Old Device',
+        'placement': 'leftWrist',
+        'serialNumber': null,
+        'status': 'loose',
+      };
+      final looseDevice = Device.fromMap(looseMap);
+      expect(looseDevice.location, DeviceLocation.loose);
+
+      // Old format: charging status
+      final chargingMap = {
+        'id': 'test-id-2',
+        'name': 'Charging Device',
+        'placement': 'rightWrist',
+        'serialNumber': null,
+        'status': 'charging',
+      };
+      final chargingDevice = Device.fromMap(chargingMap);
+      expect(chargingDevice.location, DeviceLocation.charging);
+
+      // Old format: worn status (uses placement)
+      final wornMap = {
+        'id': 'test-id-3',
+        'name': 'Worn Device',
+        'placement': 'leftAnkle',
+        'serialNumber': 'SN456',
+        'status': 'worn',
+      };
+      final wornDevice = Device.fromMap(wornMap);
+      expect(wornDevice.location, DeviceLocation.leftAnkle);
     });
 
-    test('status labels are readable', () {
-      expect(Device.statusLabel(DeviceStatus.worn), 'Worn');
-      expect(Device.statusLabel(DeviceStatus.loose), 'Loose');
-      expect(Device.statusLabel(DeviceStatus.charging), 'Charging');
+    test('isWorn returns correct value', () {
+      expect(Device(name: 'D1', location: DeviceLocation.loose).isWorn, false);
+      expect(Device(name: 'D2', location: DeviceLocation.charging).isWorn, false);
+      expect(Device(name: 'D3', location: DeviceLocation.leftWrist).isWorn, true);
+      expect(Device(name: 'D4', location: DeviceLocation.chest).isWorn, true);
+    });
+
+    test('location labels are readable', () {
+      expect(Device.locationLabel(DeviceLocation.loose), 'Loose');
+      expect(Device.locationLabel(DeviceLocation.charging), 'Charging');
+      expect(Device.locationLabel(DeviceLocation.leftWrist), 'Left Wrist');
+      expect(Device.locationLabel(DeviceLocation.rightAnkle), 'Right Ankle');
+      expect(Device.locationLabel(DeviceLocation.finger), 'Finger');
+      expect(Device.locationLabel(DeviceLocation.chest), 'Chest');
     });
   });
 }
