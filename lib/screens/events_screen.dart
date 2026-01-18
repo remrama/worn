@@ -270,19 +270,43 @@ class StopEventDialog extends StatefulWidget {
 
 class _StopEventDialogState extends State<StopEventDialog> {
   bool _useWindow = false;
-  TimeOfDay? _earliestTime;
-  TimeOfDay? _latestTime;
+  late DateTime _earliestDate;
+  late DateTime _latestDate;
+  late TimeOfDay _earliestTime;
+  late TimeOfDay _latestTime;
 
   @override
   void initState() {
     super.initState();
-    final now = TimeOfDay.now();
-    _earliestTime = now;
-    _latestTime = now;
+    final now = DateTime.now();
+    _earliestDate = now;
+    _latestDate = now;
+    _earliestTime = TimeOfDay.now();
+    _latestTime = TimeOfDay.now();
+  }
+
+  Future<void> _pickDate(bool isEarliest) async {
+    final initial = isEarliest ? _earliestDate : _latestDate;
+    final firstDate = widget.event.startEarliest.toLocal();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(firstDate.year, firstDate.month, firstDate.day),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (picked != null) {
+      setState(() {
+        if (isEarliest) {
+          _earliestDate = picked;
+        } else {
+          _latestDate = picked;
+        }
+      });
+    }
   }
 
   Future<void> _pickTime(bool isEarliest) async {
-    final initial = isEarliest ? _earliestTime! : _latestTime!;
+    final initial = isEarliest ? _earliestTime : _latestTime;
     final picked = await showTimePicker(context: context, initialTime: initial);
     if (picked != null) {
       setState(() {
@@ -295,6 +319,10 @@ class _StopEventDialogState extends State<StopEventDialog> {
     }
   }
 
+  String _formatDate(DateTime d) {
+    return '${d.month}/${d.day}/${d.year}';
+  }
+
   String _formatTimeOfDay(TimeOfDay t) {
     final h = t.hour;
     final m = t.minute.toString().padLeft(2, '0');
@@ -303,13 +331,14 @@ class _StopEventDialogState extends State<StopEventDialog> {
     return '$hour12:$m $ampm';
   }
 
-  void _submit() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+  DateTime _combineDateTime(DateTime date, TimeOfDay time) {
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute).toUtc();
+  }
 
+  void _submit() {
     if (_useWindow) {
-      final earliest = today.add(Duration(hours: _earliestTime!.hour, minutes: _earliestTime!.minute)).toUtc();
-      final latest = today.add(Duration(hours: _latestTime!.hour, minutes: _latestTime!.minute)).toUtc();
+      final earliest = _combineDateTime(_earliestDate, _earliestTime);
+      final latest = _combineDateTime(_latestDate, _latestTime);
       Navigator.pop(context, StopEventResult(stopEarliest: earliest, stopLatest: latest));
     } else {
       final stopTime = DateTime.now().toUtc();
@@ -335,19 +364,47 @@ class _StopEventDialogState extends State<StopEventDialog> {
             ),
             if (_useWindow) ...[
               const SizedBox(height: 16),
-              const Text('Earliest stop time:', style: TextStyle(fontWeight: FontWeight.bold)),
-              ListTile(
-                title: Text(_formatTimeOfDay(_earliestTime!)),
-                trailing: const Icon(Icons.access_time),
-                onTap: () => _pickTime(true),
-                contentPadding: EdgeInsets.zero,
+              const Text('Earliest stop:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  Expanded(
+                    child: ListTile(
+                      title: Text(_formatDate(_earliestDate)),
+                      leading: const Icon(Icons.calendar_today, size: 20),
+                      onTap: () => _pickDate(true),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  Expanded(
+                    child: ListTile(
+                      title: Text(_formatTimeOfDay(_earliestTime)),
+                      leading: const Icon(Icons.access_time, size: 20),
+                      onTap: () => _pickTime(true),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
               ),
-              const Text('Latest stop time:', style: TextStyle(fontWeight: FontWeight.bold)),
-              ListTile(
-                title: Text(_formatTimeOfDay(_latestTime!)),
-                trailing: const Icon(Icons.access_time),
-                onTap: () => _pickTime(false),
-                contentPadding: EdgeInsets.zero,
+              const Text('Latest stop:', style: TextStyle(fontWeight: FontWeight.bold)),
+              Row(
+                children: [
+                  Expanded(
+                    child: ListTile(
+                      title: Text(_formatDate(_latestDate)),
+                      leading: const Icon(Icons.calendar_today, size: 20),
+                      onTap: () => _pickDate(false),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                  Expanded(
+                    child: ListTile(
+                      title: Text(_formatTimeOfDay(_latestTime)),
+                      leading: const Icon(Icons.access_time, size: 20),
+                      onTap: () => _pickTime(false),
+                      contentPadding: EdgeInsets.zero,
+                    ),
+                  ),
+                ],
               ),
             ],
           ],
@@ -383,11 +440,26 @@ class RetroactiveEventDialog extends StatefulWidget {
 class _RetroactiveEventDialogState extends State<RetroactiveEventDialog> {
   EventType? _selectedType;
   String? _customName;
-  DateTime _selectedDate = DateTime.now();
-  TimeOfDay _startEarliest = const TimeOfDay(hour: 12, minute: 0);
-  TimeOfDay _startLatest = const TimeOfDay(hour: 12, minute: 0);
-  TimeOfDay _stopEarliest = const TimeOfDay(hour: 13, minute: 0);
-  TimeOfDay _stopLatest = const TimeOfDay(hour: 13, minute: 0);
+
+  late DateTime _startEarliestDate;
+  late DateTime _startLatestDate;
+  late DateTime _stopEarliestDate;
+  late DateTime _stopLatestDate;
+
+  TimeOfDay _startEarliestTime = const TimeOfDay(hour: 12, minute: 0);
+  TimeOfDay _startLatestTime = const TimeOfDay(hour: 12, minute: 0);
+  TimeOfDay _stopEarliestTime = const TimeOfDay(hour: 13, minute: 0);
+  TimeOfDay _stopLatestTime = const TimeOfDay(hour: 13, minute: 0);
+
+  @override
+  void initState() {
+    super.initState();
+    final today = DateTime.now();
+    _startEarliestDate = today;
+    _startLatestDate = today;
+    _stopEarliestDate = today;
+    _stopLatestDate = today;
+  }
 
   Future<void> _selectType() async {
     final type = await showDialog<EventType>(
@@ -435,15 +507,40 @@ class _RetroactiveEventDialogState extends State<RetroactiveEventDialog> {
     }
   }
 
-  Future<void> _selectDate() async {
+  Future<void> _pickDate(String which) async {
+    DateTime initial;
+    switch (which) {
+      case 'startEarliest':
+        initial = _startEarliestDate;
+      case 'startLatest':
+        initial = _startLatestDate;
+      case 'stopEarliest':
+        initial = _stopEarliestDate;
+      case 'stopLatest':
+        initial = _stopLatestDate;
+      default:
+        return;
+    }
+
     final picked = await showDatePicker(
       context: context,
-      initialDate: _selectedDate,
+      initialDate: initial,
       firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now(),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
     );
     if (picked != null) {
-      setState(() => _selectedDate = picked);
+      setState(() {
+        switch (which) {
+          case 'startEarliest':
+            _startEarliestDate = picked;
+          case 'startLatest':
+            _startLatestDate = picked;
+          case 'stopEarliest':
+            _stopEarliestDate = picked;
+          case 'stopLatest':
+            _stopLatestDate = picked;
+        }
+      });
     }
   }
 
@@ -451,13 +548,13 @@ class _RetroactiveEventDialogState extends State<RetroactiveEventDialog> {
     TimeOfDay initial;
     switch (which) {
       case 'startEarliest':
-        initial = _startEarliest;
+        initial = _startEarliestTime;
       case 'startLatest':
-        initial = _startLatest;
+        initial = _startLatestTime;
       case 'stopEarliest':
-        initial = _stopEarliest;
+        initial = _stopEarliestTime;
       case 'stopLatest':
-        initial = _stopLatest;
+        initial = _stopLatestTime;
       default:
         return;
     }
@@ -467,13 +564,13 @@ class _RetroactiveEventDialogState extends State<RetroactiveEventDialog> {
       setState(() {
         switch (which) {
           case 'startEarliest':
-            _startEarliest = picked;
+            _startEarliestTime = picked;
           case 'startLatest':
-            _startLatest = picked;
+            _startLatestTime = picked;
           case 'stopEarliest':
-            _stopEarliest = picked;
+            _stopEarliestTime = picked;
           case 'stopLatest':
-            _stopLatest = picked;
+            _stopLatestTime = picked;
         }
       });
     }
@@ -501,17 +598,60 @@ class _RetroactiveEventDialogState extends State<RetroactiveEventDialog> {
     final event = Event(
       type: _selectedType!,
       customName: _customName,
-      startEarliest: _combineDateTime(_selectedDate, _startEarliest),
-      startLatest: _combineDateTime(_selectedDate, _startLatest),
+      startEarliest: _combineDateTime(_startEarliestDate, _startEarliestTime),
+      startLatest: _combineDateTime(_startLatestDate, _startLatestTime),
     );
 
     Navigator.pop(
       context,
       RetroactiveEventResult(
         event: event,
-        stopEarliest: _combineDateTime(_selectedDate, _stopEarliest),
-        stopLatest: _combineDateTime(_selectedDate, _stopLatest),
+        stopEarliest: _combineDateTime(_stopEarliestDate, _stopEarliestTime),
+        stopLatest: _combineDateTime(_stopLatestDate, _stopLatestTime),
       ),
+    );
+  }
+
+  Widget _buildDateTimeRow(String label, String dateKey, String timeKey, DateTime date, TimeOfDay time) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () => _pickDate(dateKey),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 16),
+                      const SizedBox(width: 4),
+                      Text(_formatDate(date)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: InkWell(
+                onTap: () => _pickTime(timeKey),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time, size: 16),
+                      const SizedBox(width: 4),
+                      Text(_formatTimeOfDay(time)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -536,57 +676,15 @@ class _RetroactiveEventDialogState extends State<RetroactiveEventDialog> {
               contentPadding: EdgeInsets.zero,
             ),
             const Divider(),
-            ListTile(
-              title: const Text('Date'),
-              subtitle: Text(_formatDate(_selectedDate)),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: _selectDate,
-              contentPadding: EdgeInsets.zero,
-            ),
-            const Divider(),
             const Text('Start Time Window', style: TextStyle(fontWeight: FontWeight.bold)),
-            Row(
-              children: [
-                Expanded(
-                  child: ListTile(
-                    title: const Text('Earliest'),
-                    subtitle: Text(_formatTimeOfDay(_startEarliest)),
-                    onTap: () => _pickTime('startEarliest'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                Expanded(
-                  child: ListTile(
-                    title: const Text('Latest'),
-                    subtitle: Text(_formatTimeOfDay(_startLatest)),
-                    onTap: () => _pickTime('startLatest'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(height: 8),
+            _buildDateTimeRow('Earliest', 'startEarliest', 'startEarliest', _startEarliestDate, _startEarliestTime),
+            _buildDateTimeRow('Latest', 'startLatest', 'startLatest', _startLatestDate, _startLatestTime),
             const Divider(),
             const Text('Stop Time Window', style: TextStyle(fontWeight: FontWeight.bold)),
-            Row(
-              children: [
-                Expanded(
-                  child: ListTile(
-                    title: const Text('Earliest'),
-                    subtitle: Text(_formatTimeOfDay(_stopEarliest)),
-                    onTap: () => _pickTime('stopEarliest'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-                Expanded(
-                  child: ListTile(
-                    title: const Text('Latest'),
-                    subtitle: Text(_formatTimeOfDay(_stopLatest)),
-                    onTap: () => _pickTime('stopLatest'),
-                    contentPadding: EdgeInsets.zero,
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(height: 8),
+            _buildDateTimeRow('Earliest', 'stopEarliest', 'stopEarliest', _stopEarliestDate, _stopEarliestTime),
+            _buildDateTimeRow('Latest', 'stopLatest', 'stopLatest', _stopLatestDate, _stopLatestTime),
           ],
         ),
       ),
