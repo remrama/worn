@@ -95,6 +95,16 @@ class _DevicesScreenState extends State<DevicesScreen> {
     }
   }
 
+  Future<void> _addDeviceNote(Device device) async {
+    final note = await showDialog<String>(
+      context: context,
+      builder: (ctx) => NoteDialog(deviceName: device.name),
+    );
+    if (note != null && note.trim().isNotEmpty) {
+      await LogService.instance.logNote(note.trim(), device: device);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -115,12 +125,19 @@ class _DevicesScreenState extends State<DevicesScreen> {
                         children: [
                           _locationChip(d),
                           IconButton(
+                            icon: const Icon(Icons.note_add, size: 20),
+                            onPressed: () => _addDeviceNote(d),
+                            tooltip: 'Add note',
+                          ),
+                          IconButton(
                             icon: const Icon(Icons.edit, size: 20),
                             onPressed: () => _editDevice(d),
+                            tooltip: 'Edit',
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete, size: 20),
                             onPressed: () => _deleteDevice(d),
+                            tooltip: 'Delete',
                           ),
                         ],
                       ),
@@ -271,7 +288,8 @@ class LocationPickerDialog extends StatelessWidget {
 }
 
 class NoteDialog extends StatefulWidget {
-  const NoteDialog({super.key});
+  final String? deviceName;
+  const NoteDialog({super.key, this.deviceName});
 
   @override
   State<NoteDialog> createState() => _NoteDialogState();
@@ -292,8 +310,11 @@ class _NoteDialogState extends State<NoteDialog> {
 
   @override
   Widget build(BuildContext context) {
+    final title = widget.deviceName != null
+        ? 'Note for ${widget.deviceName}'
+        : 'Add Note';
     return AlertDialog(
-      title: const Text('Add Note'),
+      title: Text(title),
       content: TextField(
         controller: _controller,
         decoration: const InputDecoration(hintText: 'Enter your note...'),

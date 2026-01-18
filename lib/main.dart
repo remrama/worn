@@ -16,7 +16,7 @@ class WornApp extends StatelessWidget {
     return MaterialApp(
       title: 'Worn',
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.orange),
         useMaterial3: true,
       ),
       home: const MainScreen(),
