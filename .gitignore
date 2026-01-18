@@ -87,7 +87,8 @@ app.*.map.json
 *.jks
 
 # Web
-/web/
+# Keep web platform files but ignore build output
+/build/web/
 
 # Windows
 windows/flutter/generated_plugin_registrant.cc

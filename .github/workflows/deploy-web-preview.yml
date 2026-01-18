@@ -1,0 +1,55 @@
+name: Deploy Web Preview
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  deploy-preview:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: 'stable'
+          cache: true
+
+      - name: Get dependencies
+        run: flutter pub get
+
+      - name: Build web
+        run: flutter build web --release --base-href=/
+
+      - name: Deploy to Vercel
+        uses: amondnet/vercel-action@v25
+        id: vercel-deploy
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./build/web
+          scope: ${{ secrets.VERCEL_ORG_ID }}
+
+      - name: Comment PR with preview URL
+        uses: actions/github-script@v7
+        if: github.event_name == 'pull_request'
+        with:
+          script: |
+            const previewUrl = '${{ steps.vercel-deploy.outputs.preview-url }}';
+            const comment = `## 🚀 Web Preview Deployed!
+
+            Your changes have been deployed to Vercel:
+
+            🔗 **Preview URL:** ${previewUrl}
+
+            This preview will be automatically updated when you push new commits to this PR.`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
