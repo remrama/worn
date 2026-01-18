@@ -39,11 +39,19 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _shareLog() async {
-    final content = await LogService.instance.getLogContent();
-    await Share.share(
-      content,
-      subject: 'Worn Log Export',
-    );
+    try {
+      final content = await LogService.instance.getLogContent();
+      await Share.share(
+        content,
+        subject: 'Worn Log Export',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to share log: $e')),
+        );
+      }
+    }
   }
 
   @override
