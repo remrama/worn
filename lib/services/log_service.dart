@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/device.dart';
+import '../models/event.dart';
 
 class LogService {
   static const _key = 'worn_log';
@@ -77,6 +78,44 @@ class LogService {
     } else {
       await _append('${_timestamp()}\tNOTE\t$sanitized');
     }
+  }
+
+  String _formatTimeWindow(DateTime earliest, DateTime latest) {
+    if (earliest == latest) {
+      return earliest.toIso8601String();
+    }
+    return '${earliest.toIso8601String()}..${latest.toIso8601String()}';
+  }
+
+  Future<void> logEventStarted(Event event) async {
+    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
+    await _append(
+      '${_timestamp()}\tEVENT_STARTED\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow',
+    );
+  }
+
+  Future<void> logEventStopped(
+    Event event,
+    DateTime stopEarliest,
+    DateTime stopLatest,
+  ) async {
+    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
+    final stopWindow = _formatTimeWindow(stopEarliest, stopLatest);
+    await _append(
+      '${_timestamp()}\tEVENT_STOPPED\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow\t$stopWindow',
+    );
+  }
+
+  Future<void> logRetroactiveEvent(
+    Event event,
+    DateTime stopEarliest,
+    DateTime stopLatest,
+  ) async {
+    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
+    final stopWindow = _formatTimeWindow(stopEarliest, stopLatest);
+    await _append(
+      '${_timestamp()}\tEVENT_RETROACTIVE\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow\t$stopWindow',
+    );
   }
 
   Future<List<String>> getLogLines() async {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'screens/devices_screen.dart';
+import 'screens/logs_screen.dart';
 import 'screens/history_screen.dart';
 
 void main() {
@@ -35,7 +35,7 @@ class _MainScreenState extends State<MainScreen> {
   int _currentIndex = 0;
 
   final _screens = const [
-    DevicesScreen(),
+    LogsScreen(),
     HistoryScreen(),
   ];
 
@@ -60,7 +60,7 @@ class _MainScreenState extends State<MainScreen> {
         selectedIndex: _currentIndex,
         onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.watch), label: 'Devices'),
+          NavigationDestination(icon: Icon(Icons.edit_note), label: 'Logs'),
           NavigationDestination(icon: Icon(Icons.history), label: 'History'),
         ],
       ),
