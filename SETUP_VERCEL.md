@@ -102,3 +102,19 @@ The GitHub Actions approach (described above) gives more control over the build 
 - Some mobile-specific features may not work on web (this is expected)
 - Preview deployments are temporary and will be deleted after PR closure
 - Each PR gets a unique, stable URL that updates with new commits
+
+## Testing Locally
+
+To test the web build locally before pushing:
+
+```bash
+# Build for web
+flutter build web --release
+
+# Serve locally (requires a local web server)
+cd build/web
+python3 -m http.server 8000
+# Open http://localhost:8000 in your browser
+```
+
+The app uses `shared_preferences` which works on web (uses browser localStorage), so the core functionality should work correctly.
