@@ -39,7 +39,7 @@ class LogService {
   Future<void> logDeviceAdded(Device device) async {
     final sn = device.serialNumber ?? 'none';
     await _append(
-      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\t${device.name}\t${device.placement.name}\t$sn',
+      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\t${device.name}\t${device.location.name}\t$sn',
     );
   }
 
@@ -47,9 +47,6 @@ class LogService {
     final changes = <String>[];
     if (oldDevice.name != newDevice.name) {
       changes.add('name:${oldDevice.name}->${newDevice.name}');
-    }
-    if (oldDevice.placement != newDevice.placement) {
-      changes.add('placement:${oldDevice.placement.name}->${newDevice.placement.name}');
     }
     if (oldDevice.serialNumber != newDevice.serialNumber) {
       changes.add('sn:${oldDevice.serialNumber ?? "none"}->${newDevice.serialNumber ?? "none"}');
@@ -67,10 +64,14 @@ class LogService {
     );
   }
 
-  Future<void> logStatusChanged(Device device, DeviceStatus oldStatus, DeviceStatus newStatus) async {
+  Future<void> logLocationChanged(Device device, DeviceLocation oldLocation, DeviceLocation newLocation) async {
     await _append(
-      '${_timestamp()}\tSTATUS_CHANGED\t${device.id}\t${device.name}\t${oldStatus.name}->${newStatus.name}',
+      '${_timestamp()}\tLOCATION_CHANGED\t${device.id}\t${device.name}\t${oldLocation.name}->${newLocation.name}',
     );
+  }
+
+  Future<void> logNote(String note) async {
+    await _append('${_timestamp()}\tNOTE\t${note.replaceAll('\t', ' ').replaceAll('\n', ' ')}');
   }
 
   Future<List<String>> getLogLines() async {

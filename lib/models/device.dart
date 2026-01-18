@@ -1,36 +1,49 @@
 import 'package:uuid/uuid.dart';
 
-enum DeviceStatus { worn, loose, charging }
-
-enum Placement { leftWrist, rightWrist, leftAnkle, rightAnkle, finger, other }
+enum DeviceLocation {
+  // Non-body locations (top of dropdown)
+  loose,
+  charging,
+  // Body parts
+  leftWrist,
+  rightWrist,
+  leftAnkle,
+  rightAnkle,
+  leftUpperArm,
+  rightUpperArm,
+  leftThigh,
+  rightThigh,
+  chest,
+  waist,
+  neck,
+  head,
+  finger,
+  other,
+}
 
 class Device {
   final String id;
   final String name;
-  final Placement placement;
+  final DeviceLocation location;
   final String? serialNumber;
-  final DeviceStatus status;
 
   Device({
     String? id,
     required this.name,
-    required this.placement,
+    this.location = DeviceLocation.loose,
     this.serialNumber,
-    this.status = DeviceStatus.loose,
   }) : id = id ?? const Uuid().v4();
 
   Device copyWith({
     String? name,
-    Placement? placement,
+    DeviceLocation? location,
     String? serialNumber,
-    DeviceStatus? status,
   }) {
     return Device(
       id: id,
       name: name ?? this.name,
-      placement: placement ?? this.placement,
+      location: location ?? this.location,
       serialNumber: serialNumber ?? this.serialNumber,
-      status: status ?? this.status,
     );
   }
 
@@ -38,9 +51,8 @@ class Device {
     return {
       'id': id,
       'name': name,
-      'placement': placement.name,
+      'location': location.name,
       'serialNumber': serialNumber,
-      'status': status.name,
     };
   }
 
@@ -48,37 +60,67 @@ class Device {
     return Device(
       id: map['id'],
       name: map['name'],
-      placement: Placement.values.byName(map['placement']),
+      location: _parseLocation(map),
       serialNumber: map['serialNumber'],
-      status: DeviceStatus.values.byName(map['status']),
     );
   }
 
-  static String placementLabel(Placement p) {
-    switch (p) {
-      case Placement.leftWrist:
-        return 'Left Wrist';
-      case Placement.rightWrist:
-        return 'Right Wrist';
-      case Placement.leftAnkle:
-        return 'Left Ankle';
-      case Placement.rightAnkle:
-        return 'Right Ankle';
-      case Placement.finger:
-        return 'Finger';
-      case Placement.other:
-        return 'Other';
+  /// Parse location from map, handling migration from old format
+  static DeviceLocation _parseLocation(Map<String, dynamic> map) {
+    // New format: single 'location' field
+    if (map.containsKey('location')) {
+      return DeviceLocation.values.byName(map['location']);
     }
+    // Old format migration: combine 'status' and 'placement'
+    final status = map['status'] as String?;
+    final placement = map['placement'] as String?;
+    if (status == 'loose') return DeviceLocation.loose;
+    if (status == 'charging') return DeviceLocation.charging;
+    // If worn, use the placement as location
+    if (placement != null) {
+      return DeviceLocation.values.byName(placement);
+    }
+    return DeviceLocation.loose;
   }
 
-  static String statusLabel(DeviceStatus s) {
-    switch (s) {
-      case DeviceStatus.worn:
-        return 'Worn';
-      case DeviceStatus.loose:
+  /// Whether the device is currently being worn (on a body part)
+  bool get isWorn =>
+      location != DeviceLocation.loose && location != DeviceLocation.charging;
+
+  static String locationLabel(DeviceLocation loc) {
+    switch (loc) {
+      case DeviceLocation.loose:
         return 'Loose';
-      case DeviceStatus.charging:
+      case DeviceLocation.charging:
         return 'Charging';
+      case DeviceLocation.leftWrist:
+        return 'Left Wrist';
+      case DeviceLocation.rightWrist:
+        return 'Right Wrist';
+      case DeviceLocation.leftAnkle:
+        return 'Left Ankle';
+      case DeviceLocation.rightAnkle:
+        return 'Right Ankle';
+      case DeviceLocation.leftUpperArm:
+        return 'Left Upper Arm';
+      case DeviceLocation.rightUpperArm:
+        return 'Right Upper Arm';
+      case DeviceLocation.leftThigh:
+        return 'Left Thigh';
+      case DeviceLocation.rightThigh:
+        return 'Right Thigh';
+      case DeviceLocation.chest:
+        return 'Chest';
+      case DeviceLocation.waist:
+        return 'Waist';
+      case DeviceLocation.neck:
+        return 'Neck';
+      case DeviceLocation.head:
+        return 'Head';
+      case DeviceLocation.finger:
+        return 'Finger';
+      case DeviceLocation.other:
+        return 'Other';
     }
   }
 }
