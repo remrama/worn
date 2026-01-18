@@ -70,8 +70,13 @@ class LogService {
     );
   }
 
-  Future<void> logNote(String note) async {
-    await _append('${_timestamp()}\tNOTE\t${note.replaceAll('\t', ' ').replaceAll('\n', ' ')}');
+  Future<void> logNote(String note, {Device? device}) async {
+    final sanitized = note.replaceAll('\t', ' ').replaceAll('\n', ' ');
+    if (device != null) {
+      await _append('${_timestamp()}\tNOTE\t${device.id}\t${device.name}\t$sanitized');
+    } else {
+      await _append('${_timestamp()}\tNOTE\t$sanitized');
+    }
   }
 
   Future<List<String>> getLogLines() async {
