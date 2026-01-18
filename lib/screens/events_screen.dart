@@ -39,29 +39,25 @@ class _EventsScreenState extends State<EventsScreen> {
     });
   }
 
-  Future<void> _startEvent() async {
-    final result = await showDialog<Event>(
+  Future<void> _addEvent() async {
+    final result = await showDialog<AddEventResult>(
       context: context,
-      builder: (ctx) => const EventPickerDialog(),
+      builder: (ctx) => const AddEventDialog(),
     );
     if (result != null) {
-      await EventStore.instance.startEvent(result);
-      await LogService.instance.logEventStarted(result);
-      _load();
-    }
-  }
-
-  Future<void> _addRetroactiveEvent() async {
-    final result = await showDialog<RetroactiveEventResult>(
-      context: context,
-      builder: (ctx) => const RetroactiveEventDialog(),
-    );
-    if (result != null) {
-      await LogService.instance.logRetroactiveEvent(
-        result.event,
-        result.stopEarliest,
-        result.stopLatest,
-      );
+      if (result.includeStop) {
+        // Historical/completed event - log directly without adding to active list
+        await LogService.instance.logRetroactiveEvent(
+          result.event,
+          result.stopEarliest!,
+          result.stopLatest!,
+        );
+      } else {
+        // Active event - add to store and log start
+        await EventStore.instance.startEvent(result.event);
+        await LogService.instance.logEventStarted(result.event);
+        _load();
+      }
     }
   }
 
@@ -134,7 +130,7 @@ class _EventsScreenState extends State<EventsScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _events.isEmpty
-              ? const Center(child: Text('No active events. Tap + to start one.'))
+              ? const Center(child: Text('No active events. Tap + to add one.'))
               : ListView.builder(
                   itemCount: _events.length,
                   itemBuilder: (ctx, i) {
@@ -152,63 +148,311 @@ class _EventsScreenState extends State<EventsScreen> {
                     );
                   },
                 ),
-      floatingActionButton: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          FloatingActionButton.small(
-            heroTag: 'retroactive',
-            onPressed: _addRetroactiveEvent,
-            tooltip: 'Add past event',
-            child: const Icon(Icons.history),
-          ),
-          const SizedBox(height: 8),
-          FloatingActionButton(
-            heroTag: 'start',
-            onPressed: _startEvent,
-            tooltip: 'Start event',
-            child: const Icon(Icons.add),
-          ),
-        ],
+      floatingActionButton: FloatingActionButton(
+        onPressed: _addEvent,
+        tooltip: 'Add event',
+        child: const Icon(Icons.add),
       ),
     );
   }
 }
 
-class EventPickerDialog extends StatelessWidget {
-  const EventPickerDialog({super.key});
+class AddEventResult {
+  final Event event;
+  final bool includeStop;
+  final DateTime? stopEarliest;
+  final DateTime? stopLatest;
+
+  AddEventResult({
+    required this.event,
+    required this.includeStop,
+    this.stopEarliest,
+    this.stopLatest,
+  });
+}
+
+class AddEventDialog extends StatefulWidget {
+  const AddEventDialog({super.key});
+
+  @override
+  State<AddEventDialog> createState() => _AddEventDialogState();
+}
+
+class _AddEventDialogState extends State<AddEventDialog> {
+  EventType? _selectedType;
+  String? _customName;
+  bool _includeStop = false;
+
+  late DateTime _startEarliestDate;
+  late DateTime _startLatestDate;
+  late DateTime _stopEarliestDate;
+  late DateTime _stopLatestDate;
+
+  late TimeOfDay _startEarliestTime;
+  late TimeOfDay _startLatestTime;
+  late TimeOfDay _stopEarliestTime;
+  late TimeOfDay _stopLatestTime;
+
+  @override
+  void initState() {
+    super.initState();
+    final now = DateTime.now();
+    final nowTime = TimeOfDay.now();
+
+    _startEarliestDate = now;
+    _startLatestDate = now;
+    _stopEarliestDate = now;
+    _stopLatestDate = now;
+
+    _startEarliestTime = nowTime;
+    _startLatestTime = nowTime;
+    _stopEarliestTime = nowTime;
+    _stopLatestTime = nowTime;
+  }
+
+  Future<void> _selectType() async {
+    final type = await showDialog<EventType>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Select Event Type'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: EventType.values.length,
+            itemBuilder: (ctx, i) {
+              final t = EventType.values[i];
+              return ListTile(
+                title: Text(Event.labelFor(t)),
+                onTap: () => Navigator.pop(ctx, t),
+              );
+            },
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+        ],
+      ),
+    );
+    if (type != null) {
+      if (type == EventType.other) {
+        if (!mounted) return;
+        final name = await showDialog<String>(
+          context: context,
+          builder: (ctx) => const CustomEventNameDialog(),
+        );
+        if (name != null && name.trim().isNotEmpty && mounted) {
+          setState(() {
+            _selectedType = type;
+            _customName = name.trim();
+          });
+        }
+      } else {
+        setState(() {
+          _selectedType = type;
+          _customName = null;
+        });
+      }
+    }
+  }
+
+  Future<void> _pickDate(String which) async {
+    DateTime initial;
+    switch (which) {
+      case 'startEarliest':
+        initial = _startEarliestDate;
+      case 'startLatest':
+        initial = _startLatestDate;
+      case 'stopEarliest':
+        initial = _stopEarliestDate;
+      case 'stopLatest':
+        initial = _stopLatestDate;
+      default:
+        return;
+    }
+
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 1)),
+    );
+    if (picked != null) {
+      setState(() {
+        switch (which) {
+          case 'startEarliest':
+            _startEarliestDate = picked;
+          case 'startLatest':
+            _startLatestDate = picked;
+          case 'stopEarliest':
+            _stopEarliestDate = picked;
+          case 'stopLatest':
+            _stopLatestDate = picked;
+        }
+      });
+    }
+  }
+
+  Future<void> _pickTime(String which) async {
+    TimeOfDay initial;
+    switch (which) {
+      case 'startEarliest':
+        initial = _startEarliestTime;
+      case 'startLatest':
+        initial = _startLatestTime;
+      case 'stopEarliest':
+        initial = _stopEarliestTime;
+      case 'stopLatest':
+        initial = _stopLatestTime;
+      default:
+        return;
+    }
+
+    final picked = await showTimePicker(context: context, initialTime: initial);
+    if (picked != null) {
+      setState(() {
+        switch (which) {
+          case 'startEarliest':
+            _startEarliestTime = picked;
+          case 'startLatest':
+            _startLatestTime = picked;
+          case 'stopEarliest':
+            _stopEarliestTime = picked;
+          case 'stopLatest':
+            _stopLatestTime = picked;
+        }
+      });
+    }
+  }
+
+  String _formatTimeOfDay(TimeOfDay t) {
+    final h = t.hour;
+    final m = t.minute.toString().padLeft(2, '0');
+    final ampm = h >= 12 ? 'PM' : 'AM';
+    final hour12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
+    return '$hour12:$m $ampm';
+  }
+
+  String _formatDate(DateTime d) {
+    return '${d.month}/${d.day}/${d.year}';
+  }
+
+  DateTime _combineDateTime(DateTime date, TimeOfDay time) {
+    return DateTime(date.year, date.month, date.day, time.hour, time.minute).toUtc();
+  }
+
+  void _submit() {
+    if (_selectedType == null) return;
+
+    final event = Event(
+      type: _selectedType!,
+      customName: _customName,
+      startEarliest: _combineDateTime(_startEarliestDate, _startEarliestTime),
+      startLatest: _combineDateTime(_startLatestDate, _startLatestTime),
+    );
+
+    Navigator.pop(
+      context,
+      AddEventResult(
+        event: event,
+        includeStop: _includeStop,
+        stopEarliest: _includeStop ? _combineDateTime(_stopEarliestDate, _stopEarliestTime) : null,
+        stopLatest: _includeStop ? _combineDateTime(_stopLatestDate, _stopLatestTime) : null,
+      ),
+    );
+  }
+
+  Widget _buildDateTimeRow(String label, String dateKey, String timeKey, DateTime date, TimeOfDay time) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+        Row(
+          children: [
+            Expanded(
+              child: InkWell(
+                onTap: () => _pickDate(dateKey),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.calendar_today, size: 16),
+                      const SizedBox(width: 4),
+                      Text(_formatDate(date)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Expanded(
+              child: InkWell(
+                onTap: () => _pickTime(timeKey),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.access_time, size: 16),
+                      const SizedBox(width: 4),
+                      Text(_formatTimeOfDay(time)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    final eventLabel = _selectedType != null
+        ? (_customName ?? Event.labelFor(_selectedType!))
+        : 'Select event type';
+
     return AlertDialog(
-      title: const Text('Start Event'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ListView.builder(
-          shrinkWrap: true,
-          itemCount: EventType.values.length,
-          itemBuilder: (ctx, i) {
-            final type = EventType.values[i];
-            return ListTile(
-              title: Text(Event.labelFor(type)),
-              onTap: () async {
-                if (type == EventType.other) {
-                  final customName = await showDialog<String>(
-                    context: context,
-                    builder: (ctx) => const CustomEventNameDialog(),
-                  );
-                  if (customName != null && customName.trim().isNotEmpty && context.mounted) {
-                    Navigator.pop(context, Event(type: type, customName: customName.trim()));
-                  }
-                } else {
-                  Navigator.pop(context, Event(type: type));
-                }
-              },
-            );
-          },
+      title: const Text('Add Event'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ListTile(
+              title: const Text('Event Type'),
+              subtitle: Text(eventLabel),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: _selectType,
+              contentPadding: EdgeInsets.zero,
+            ),
+            const Divider(),
+            const Text('Start Time', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            _buildDateTimeRow('Earliest', 'startEarliest', 'startEarliest', _startEarliestDate, _startEarliestTime),
+            _buildDateTimeRow('Latest', 'startLatest', 'startLatest', _startLatestDate, _startLatestTime),
+            const Divider(),
+            CheckboxListTile(
+              title: const Text('Include stop time'),
+              subtitle: const Text('Log as completed event'),
+              value: _includeStop,
+              onChanged: (v) => setState(() => _includeStop = v ?? false),
+              contentPadding: EdgeInsets.zero,
+            ),
+            if (_includeStop) ...[
+              const Text('Stop Time', style: TextStyle(fontWeight: FontWeight.bold)),
+              const SizedBox(height: 8),
+              _buildDateTimeRow('Earliest', 'stopEarliest', 'stopEarliest', _stopEarliestDate, _stopEarliestTime),
+              _buildDateTimeRow('Latest', 'stopLatest', 'stopLatest', _stopLatestDate, _stopLatestTime),
+            ],
+          ],
         ),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(
+          onPressed: _selectedType != null ? _submit : null,
+          child: const Text('Add'),
+        ),
       ],
     );
   }
@@ -413,287 +657,6 @@ class _StopEventDialogState extends State<StopEventDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         TextButton(onPressed: _submit, child: const Text('Stop')),
-      ],
-    );
-  }
-}
-
-class RetroactiveEventResult {
-  final Event event;
-  final DateTime stopEarliest;
-  final DateTime stopLatest;
-
-  RetroactiveEventResult({
-    required this.event,
-    required this.stopEarliest,
-    required this.stopLatest,
-  });
-}
-
-class RetroactiveEventDialog extends StatefulWidget {
-  const RetroactiveEventDialog({super.key});
-
-  @override
-  State<RetroactiveEventDialog> createState() => _RetroactiveEventDialogState();
-}
-
-class _RetroactiveEventDialogState extends State<RetroactiveEventDialog> {
-  EventType? _selectedType;
-  String? _customName;
-
-  late DateTime _startEarliestDate;
-  late DateTime _startLatestDate;
-  late DateTime _stopEarliestDate;
-  late DateTime _stopLatestDate;
-
-  TimeOfDay _startEarliestTime = const TimeOfDay(hour: 12, minute: 0);
-  TimeOfDay _startLatestTime = const TimeOfDay(hour: 12, minute: 0);
-  TimeOfDay _stopEarliestTime = const TimeOfDay(hour: 13, minute: 0);
-  TimeOfDay _stopLatestTime = const TimeOfDay(hour: 13, minute: 0);
-
-  @override
-  void initState() {
-    super.initState();
-    final today = DateTime.now();
-    _startEarliestDate = today;
-    _startLatestDate = today;
-    _stopEarliestDate = today;
-    _stopLatestDate = today;
-  }
-
-  Future<void> _selectType() async {
-    final type = await showDialog<EventType>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Select Event Type'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: EventType.values.length,
-            itemBuilder: (ctx, i) {
-              final t = EventType.values[i];
-              return ListTile(
-                title: Text(Event.labelFor(t)),
-                onTap: () => Navigator.pop(ctx, t),
-              );
-            },
-          ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
-        ],
-      ),
-    );
-    if (type != null) {
-      if (type == EventType.other) {
-        if (!mounted) return;
-        final name = await showDialog<String>(
-          context: context,
-          builder: (ctx) => const CustomEventNameDialog(),
-        );
-        if (name != null && name.trim().isNotEmpty && mounted) {
-          setState(() {
-            _selectedType = type;
-            _customName = name.trim();
-          });
-        }
-      } else {
-        setState(() {
-          _selectedType = type;
-          _customName = null;
-        });
-      }
-    }
-  }
-
-  Future<void> _pickDate(String which) async {
-    DateTime initial;
-    switch (which) {
-      case 'startEarliest':
-        initial = _startEarliestDate;
-      case 'startLatest':
-        initial = _startLatestDate;
-      case 'stopEarliest':
-        initial = _stopEarliestDate;
-      case 'stopLatest':
-        initial = _stopLatestDate;
-      default:
-        return;
-    }
-
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: initial,
-      firstDate: DateTime.now().subtract(const Duration(days: 365)),
-      lastDate: DateTime.now().add(const Duration(days: 1)),
-    );
-    if (picked != null) {
-      setState(() {
-        switch (which) {
-          case 'startEarliest':
-            _startEarliestDate = picked;
-          case 'startLatest':
-            _startLatestDate = picked;
-          case 'stopEarliest':
-            _stopEarliestDate = picked;
-          case 'stopLatest':
-            _stopLatestDate = picked;
-        }
-      });
-    }
-  }
-
-  Future<void> _pickTime(String which) async {
-    TimeOfDay initial;
-    switch (which) {
-      case 'startEarliest':
-        initial = _startEarliestTime;
-      case 'startLatest':
-        initial = _startLatestTime;
-      case 'stopEarliest':
-        initial = _stopEarliestTime;
-      case 'stopLatest':
-        initial = _stopLatestTime;
-      default:
-        return;
-    }
-
-    final picked = await showTimePicker(context: context, initialTime: initial);
-    if (picked != null) {
-      setState(() {
-        switch (which) {
-          case 'startEarliest':
-            _startEarliestTime = picked;
-          case 'startLatest':
-            _startLatestTime = picked;
-          case 'stopEarliest':
-            _stopEarliestTime = picked;
-          case 'stopLatest':
-            _stopLatestTime = picked;
-        }
-      });
-    }
-  }
-
-  String _formatTimeOfDay(TimeOfDay t) {
-    final h = t.hour;
-    final m = t.minute.toString().padLeft(2, '0');
-    final ampm = h >= 12 ? 'PM' : 'AM';
-    final hour12 = h == 0 ? 12 : (h > 12 ? h - 12 : h);
-    return '$hour12:$m $ampm';
-  }
-
-  String _formatDate(DateTime d) {
-    return '${d.month}/${d.day}/${d.year}';
-  }
-
-  DateTime _combineDateTime(DateTime date, TimeOfDay time) {
-    return DateTime(date.year, date.month, date.day, time.hour, time.minute).toUtc();
-  }
-
-  void _submit() {
-    if (_selectedType == null) return;
-
-    final event = Event(
-      type: _selectedType!,
-      customName: _customName,
-      startEarliest: _combineDateTime(_startEarliestDate, _startEarliestTime),
-      startLatest: _combineDateTime(_startLatestDate, _startLatestTime),
-    );
-
-    Navigator.pop(
-      context,
-      RetroactiveEventResult(
-        event: event,
-        stopEarliest: _combineDateTime(_stopEarliestDate, _stopEarliestTime),
-        stopLatest: _combineDateTime(_stopLatestDate, _stopLatestTime),
-      ),
-    );
-  }
-
-  Widget _buildDateTimeRow(String label, String dateKey, String timeKey, DateTime date, TimeOfDay time) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-        Row(
-          children: [
-            Expanded(
-              child: InkWell(
-                onTap: () => _pickDate(dateKey),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.calendar_today, size: 16),
-                      const SizedBox(width: 4),
-                      Text(_formatDate(date)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Expanded(
-              child: InkWell(
-                onTap: () => _pickTime(timeKey),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 8),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.access_time, size: 16),
-                      const SizedBox(width: 4),
-                      Text(_formatTimeOfDay(time)),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final eventLabel = _selectedType != null
-        ? (_customName ?? Event.labelFor(_selectedType!))
-        : 'Select event type';
-
-    return AlertDialog(
-      title: const Text('Add Past Event'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ListTile(
-              title: const Text('Event Type'),
-              subtitle: Text(eventLabel),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: _selectType,
-              contentPadding: EdgeInsets.zero,
-            ),
-            const Divider(),
-            const Text('Start Time Window', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            _buildDateTimeRow('Earliest', 'startEarliest', 'startEarliest', _startEarliestDate, _startEarliestTime),
-            _buildDateTimeRow('Latest', 'startLatest', 'startLatest', _startLatestDate, _startLatestTime),
-            const Divider(),
-            const Text('Stop Time Window', style: TextStyle(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
-            _buildDateTimeRow('Earliest', 'stopEarliest', 'stopEarliest', _stopEarliestDate, _stopEarliestTime),
-            _buildDateTimeRow('Latest', 'stopLatest', 'stopLatest', _stopLatestDate, _stopLatestTime),
-          ],
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-        TextButton(
-          onPressed: _selectedType != null ? _submit : null,
-          child: const Text('Add'),
-        ),
       ],
     );
   }
