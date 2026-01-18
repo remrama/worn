@@ -1,4 +1,11 @@
-# Worn
+
+[![Build Android APK](https://github.com/remrama/worn/actions/workflows/build-android.yml/badge.svg)](https://github.com/remrama/worn/actions/workflows/build-android.yml)
+---
+
+<br>
+<div align="center">
+    <img src="./logo/banner.png" alt="Worn banner" width="300">
+</div>
 
 A minimal Flutter app for logging wearable device status and event detection.
 
