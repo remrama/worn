@@ -1,5 +1,6 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/device.dart';
+import '../models/event.dart';
 
 class LogService {
   static const _key = 'worn_log';
@@ -77,6 +78,19 @@ class LogService {
     } else {
       await _append('${_timestamp()}\tNOTE\t$sanitized');
     }
+  }
+
+  Future<void> logEventStarted(Event event) async {
+    await _append(
+      '${_timestamp()}\tEVENT_STARTED\t${event.id}\t${event.type.name}\t${event.displayName}',
+    );
+  }
+
+  Future<void> logEventStopped(Event event, Duration duration) async {
+    final minutes = duration.inMinutes;
+    await _append(
+      '${_timestamp()}\tEVENT_STOPPED\t${event.id}\t${event.type.name}\t${event.displayName}\t$minutes',
+    );
   }
 
   Future<List<String>> getLogLines() async {
