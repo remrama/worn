@@ -106,6 +106,13 @@ class LogService {
     );
   }
 
+  Future<void> logEventCancelled(Event event) async {
+    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
+    await _append(
+      '${_timestamp()}\tEVENT_CANCELLED\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow',
+    );
+  }
+
   Future<void> logRetroactiveEvent(
     Event event,
     DateTime stopEarliest,
