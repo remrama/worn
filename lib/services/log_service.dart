@@ -79,6 +79,13 @@ class LogService {
     );
   }
 
+  Future<void> logDevicePowerChanged(Device device, bool isPoweredOn) async {
+    final powerState = isPoweredOn ? 'on' : 'off';
+    await _append(
+      '${_timestamp()}\tPOWER_CHANGED\t${device.id}\t${device.name}\t$powerState',
+    );
+  }
+
   Future<void> logNote(String note, {Device? device, Event? event}) async {
     final sanitized = note.replaceAll('\t', ' ').replaceAll('\n', ' ');
     if (device != null) {

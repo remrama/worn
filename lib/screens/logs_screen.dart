@@ -188,6 +188,17 @@ class _LogsScreenState extends State<LogsScreen> {
     }
   }
 
+  Future<void> _toggleDevicePower(Device device) async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
+    final newDevice = device.copyWith(isPoweredOn: !device.isPoweredOn);
+    await DeviceStore.instance.updateDevice(newDevice);
+    await LogService.instance.logDevicePowerChanged(newDevice, newDevice.isPoweredOn);
+    _load();
+  }
+
   Future<void> _addDeviceNote(Device device) async {
     if (!_isTracking) {
       _showTrackingPausedWarning();
@@ -415,7 +426,10 @@ class _LogsScreenState extends State<LogsScreen> {
             )
           else
             ..._devices.map((d) => ListTile(
-                  leading: Icon(Device.iconFor(d.deviceType)),
+                  leading: Opacity(
+                    opacity: d.isPoweredOn ? 1.0 : 0.3,
+                    child: Icon(Device.iconFor(d.deviceType)),
+                  ),
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -435,6 +449,11 @@ class _LogsScreenState extends State<LogsScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
+                      Switch(
+                        value: d.isPoweredOn,
+                        onChanged: (_) => _toggleDevicePower(d),
+                      ),
+                      const SizedBox(width: 4),
                       _locationChip(d),
                       IconButton(
                         icon: const Icon(Icons.note_add, size: 20),

@@ -11,6 +11,7 @@ void main() {
       expect(device.location, DeviceLocation.loose);
       expect(device.serialNumber, isNull);
       expect(device.id, isNotEmpty);
+      expect(device.isPoweredOn, true);
     });
 
     test('creates with all fields', () {
@@ -18,11 +19,13 @@ void main() {
         name: 'Full Device',
         location: DeviceLocation.rightWrist,
         serialNumber: 'SN123',
+        isPoweredOn: false,
       );
 
       expect(device.name, 'Full Device');
       expect(device.location, DeviceLocation.rightWrist);
       expect(device.serialNumber, 'SN123');
+      expect(device.isPoweredOn, false);
     });
 
     test('copyWith preserves unchanged fields', () {
@@ -30,6 +33,7 @@ void main() {
         name: 'Original',
         location: DeviceLocation.leftWrist,
         serialNumber: 'SN123',
+        isPoweredOn: false,
       );
 
       final updated = device.copyWith(location: DeviceLocation.charging);
@@ -38,6 +42,16 @@ void main() {
       expect(updated.name, 'Original');
       expect(updated.location, DeviceLocation.charging);
       expect(updated.serialNumber, 'SN123');
+      expect(updated.isPoweredOn, false);
+    });
+
+    test('copyWith can change isPoweredOn', () {
+      final device = Device(name: 'Test', isPoweredOn: true);
+      final updated = device.copyWith(isPoweredOn: false);
+
+      expect(updated.id, device.id);
+      expect(updated.name, device.name);
+      expect(updated.isPoweredOn, false);
     });
 
     test('toMap and fromMap roundtrip', () {
@@ -45,6 +59,7 @@ void main() {
         name: 'Roundtrip',
         location: DeviceLocation.leftIndexFinger,
         serialNumber: 'ABC',
+        isPoweredOn: false,
       );
 
       final map = device.toMap();
@@ -55,6 +70,7 @@ void main() {
       expect(restored.location, device.location);
       expect(restored.serialNumber, device.serialNumber);
       expect(restored.deviceType, device.deviceType);
+      expect(restored.isPoweredOn, device.isPoweredOn);
     });
 
     test('fromMap handles old format migration', () {
@@ -90,6 +106,19 @@ void main() {
       };
       final wornDevice = Device.fromMap(wornMap);
       expect(wornDevice.location, DeviceLocation.leftAnkle);
+    });
+
+    test('fromMap defaults isPoweredOn to true when not present', () {
+      final map = {
+        'id': 'test-id',
+        'name': 'Old Device',
+        'deviceType': 'watch',
+        'location': 'leftWrist',
+        'serialNumber': null,
+        // No isPoweredOn field
+      };
+      final device = Device.fromMap(map);
+      expect(device.isPoweredOn, true);
     });
 
     test('isWorn returns correct value', () {

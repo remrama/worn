@@ -52,6 +52,7 @@ class Device {
   final DeviceType deviceType;
   final DeviceLocation location;
   final String? serialNumber;
+  final bool isPoweredOn;
 
   Device({
     String? id,
@@ -59,6 +60,7 @@ class Device {
     this.deviceType = DeviceType.watch,
     this.location = DeviceLocation.loose,
     this.serialNumber,
+    this.isPoweredOn = true,
   }) : id = id ?? const Uuid().v4();
 
   Device copyWith({
@@ -66,6 +68,7 @@ class Device {
     DeviceType? deviceType,
     DeviceLocation? location,
     String? serialNumber,
+    bool? isPoweredOn,
   }) {
     return Device(
       id: id,
@@ -73,6 +76,7 @@ class Device {
       deviceType: deviceType ?? this.deviceType,
       location: location ?? this.location,
       serialNumber: serialNumber ?? this.serialNumber,
+      isPoweredOn: isPoweredOn ?? this.isPoweredOn,
     );
   }
 
@@ -83,6 +87,7 @@ class Device {
       'deviceType': deviceType.name,
       'location': location.name,
       'serialNumber': serialNumber,
+      'isPoweredOn': isPoweredOn,
     };
   }
 
@@ -93,6 +98,7 @@ class Device {
       deviceType: _parseDeviceType(map),
       location: _parseLocation(map),
       serialNumber: map['serialNumber'],
+      isPoweredOn: map['isPoweredOn'] ?? true,
     );
   }
 
