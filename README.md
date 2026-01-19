@@ -6,6 +6,7 @@
 <div align="center">
     <img src="./logo/banner.png" alt="Worn banner" width="300">
 </div>
+<br>
 
 **Manual logging for creating ground-truth data to evaluate wearable device algorithms.**
 
@@ -62,12 +63,4 @@ Tab-separated with UTC ISO 8601 timestamps. Time windows use `..` separator:
 2024-01-15T12:00:00.000Z	NOTE	User added a custom note
 2024-01-15T18:00:00.000Z	TRACKING_PAUSED
 2024-01-17T09:00:00.000Z	TRACKING_RESUMED
-```
-
-## Development
-
-```bash
-flutter pub get
-flutter test
-flutter run
 ```
