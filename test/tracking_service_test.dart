@@ -11,25 +11,25 @@ void main() {
       TrackingService.resetForTesting();
     });
 
-    test('initializes with default value true when no persisted state', () async {
+    test('initializes with default value false when no persisted state', () async {
       final service = TrackingService.instance;
       final isTracking = await service.isTracking();
-      expect(isTracking, true);
+      expect(isTracking, false);
     });
 
     test('persists tracking state changes', () async {
       final service = TrackingService.instance;
-      
-      // Initially true
-      expect(await service.isTracking(), true);
-      
-      // Set to false
-      await service.setTracking(false);
+
+      // Initially false
       expect(await service.isTracking(), false);
-      
-      // Set back to true
+
+      // Set to true
       await service.setTracking(true);
       expect(await service.isTracking(), true);
+
+      // Set back to false
+      await service.setTracking(false);
+      expect(await service.isTracking(), false);
     });
 
     test('retrieves persisted state across singleton instances', () async {
@@ -51,11 +51,11 @@ void main() {
 
     test('handles multiple calls to isTracking without reloading', () async {
       final service = TrackingService.instance;
-      
+
       // Multiple calls should return consistent results
-      expect(await service.isTracking(), true);
-      expect(await service.isTracking(), true);
-      expect(await service.isTracking(), true);
+      expect(await service.isTracking(), false);
+      expect(await service.isTracking(), false);
+      expect(await service.isTracking(), false);
     });
 
     test('setTracking updates internal state immediately', () async {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/log_service.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -28,16 +28,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
-  Future<void> _copyToClipboard() async {
-    final content = await LogService.instance.getLogContent();
-    await Clipboard.setData(ClipboardData(text: content));
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Log copied to clipboard')),
-      );
-    }
-  }
-
   Future<void> _shareLog() async {
     try {
       final content = await LogService.instance.getLogContent();
@@ -54,6 +44,65 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  Future<void> _wipeAllData() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Wipe All Data'),
+        content: const Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'WARNING',
+              style: TextStyle(
+                color: Colors.red,
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'This will permanently delete ALL data including:\n\n'
+              '• All devices\n'
+              '• All active events\n'
+              '• Complete log history\n'
+              '• Tracking state\n\n'
+              'This action CANNOT be undone.',
+              style: TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('DELETE ALL DATA'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('worn_devices');
+      await prefs.remove('worn_events');
+      await prefs.remove('worn_log');
+      await prefs.remove('worn_tracking');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('All data wiped successfully')),
+        );
+        _load();
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -65,10 +114,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
             tooltip: 'Share log',
             onPressed: _shareLog,
           ),
-          IconButton(
-            icon: const Icon(Icons.copy),
-            tooltip: 'Copy log to clipboard',
-            onPressed: _copyToClipboard,
+          PopupMenuButton<String>(
+            onSelected: (value) {
+              if (value == 'wipe') {
+                _wipeAllData();
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'wipe',
+                child: Row(
+                  children: [
+                    Icon(Icons.delete_forever, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Wipe All Data', style: TextStyle(color: Colors.red)),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),

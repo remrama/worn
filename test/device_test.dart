@@ -42,7 +42,7 @@ void main() {
     test('toMap and fromMap roundtrip', () {
       final device = Device(
         name: 'Roundtrip',
-        location: DeviceLocation.finger,
+        location: DeviceLocation.leftIndexFinger,
         serialNumber: 'ABC',
       );
 
@@ -53,6 +53,7 @@ void main() {
       expect(restored.name, device.name);
       expect(restored.location, device.location);
       expect(restored.serialNumber, device.serialNumber);
+      expect(restored.deviceType, device.deviceType);
     });
 
     test('fromMap handles old format migration', () {
@@ -102,7 +103,7 @@ void main() {
       expect(Device.locationLabel(DeviceLocation.charging), 'Charging');
       expect(Device.locationLabel(DeviceLocation.leftWrist), 'Left Wrist');
       expect(Device.locationLabel(DeviceLocation.rightAnkle), 'Right Ankle');
-      expect(Device.locationLabel(DeviceLocation.finger), 'Finger');
+      expect(Device.locationLabel(DeviceLocation.leftIndexFinger), 'Left Index Finger');
       expect(Device.locationLabel(DeviceLocation.chest), 'Chest');
     });
   });
