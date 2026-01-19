@@ -84,7 +84,7 @@ void main() {
       LogService.resetForTesting();
     });
 
-    test('logTrackingPaused creates TRACKING_PAUSED log entry', () async {
+    test('logTrackingPaused creates GLOBAL_TRACKING off log entry', () async {
       final service = LogService.instance;
 
       await service.logTrackingPaused();
@@ -93,15 +93,17 @@ void main() {
       expect(logLines.length, 1);
 
       final logLine = logLines.first;
-      expect(logLine, contains('TRACKING_PAUSED'));
-      
-      // Verify format: timestamp\tTRACKING_PAUSED
+      expect(logLine, contains('GLOBAL_TRACKING'));
+      expect(logLine, contains('off'));
+
+      // Verify format: timestamp\tGLOBAL_TRACKING\toff
       final fields = logLine.split('\t');
-      expect(fields.length, 2);
-      expect(fields[1], 'TRACKING_PAUSED');
+      expect(fields.length, 3);
+      expect(fields[1], 'GLOBAL_TRACKING');
+      expect(fields[2], 'off');
     });
 
-    test('logTrackingResumed creates TRACKING_RESUMED log entry', () async {
+    test('logTrackingResumed creates GLOBAL_TRACKING on log entry', () async {
       final service = LogService.instance;
 
       await service.logTrackingResumed();
@@ -110,12 +112,14 @@ void main() {
       expect(logLines.length, 1);
 
       final logLine = logLines.first;
-      expect(logLine, contains('TRACKING_RESUMED'));
-      
-      // Verify format: timestamp\tTRACKING_RESUMED
+      expect(logLine, contains('GLOBAL_TRACKING'));
+      expect(logLine, contains('on'));
+
+      // Verify format: timestamp\tGLOBAL_TRACKING\ton
       final fields = logLine.split('\t');
-      expect(fields.length, 2);
-      expect(fields[1], 'TRACKING_RESUMED');
+      expect(fields.length, 3);
+      expect(fields[1], 'GLOBAL_TRACKING');
+      expect(fields[2], 'on');
     });
 
     test('tracking log entries include valid ISO 8601 timestamps', () async {
@@ -149,11 +153,11 @@ void main() {
 
       final logLines = await service.getLogLines();
       expect(logLines.length, 4);
-      
-      expect(logLines[0], contains('TRACKING_PAUSED'));
-      expect(logLines[1], contains('TRACKING_RESUMED'));
-      expect(logLines[2], contains('TRACKING_PAUSED'));
-      expect(logLines[3], contains('TRACKING_RESUMED'));
+
+      expect(logLines[0], contains('GLOBAL_TRACKING\toff'));
+      expect(logLines[1], contains('GLOBAL_TRACKING\ton'));
+      expect(logLines[2], contains('GLOBAL_TRACKING\toff'));
+      expect(logLines[3], contains('GLOBAL_TRACKING\ton'));
     });
   });
 }

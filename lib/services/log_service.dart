@@ -75,7 +75,7 @@ class LogService {
     if (changes.isEmpty) return;
 
     await _append(
-      '${_timestamp()}\tDEVICE_UPDATED\t${newDevice.id}\t${changes.join('\t')}',
+      '${_timestamp()}\tDEVICE_UPDATED\t${newDevice.id}\t"${oldDevice.name}"\t${changes.join('\t')}',
     );
   }
 
@@ -152,10 +152,10 @@ class LogService {
   }
 
   Future<void> logTrackingPaused() async {
-    await _append('${_timestamp()}\tTRACKING_PAUSED');
+    await _append('${_timestamp()}\tGLOBAL_TRACKING\toff');
   }
 
   Future<void> logTrackingResumed() async {
-    await _append('${_timestamp()}\tTRACKING_RESUMED');
+    await _append('${_timestamp()}\tGLOBAL_TRACKING\ton');
   }
 }
