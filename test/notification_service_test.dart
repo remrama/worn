@@ -24,11 +24,11 @@ void main() {
       expect(instance1, isNot(same(instance2)));
     });
 
-    test('updateNotification with empty list calls cancelNotification', () async {
+    test('updateNotification with empty list completes without error', () async {
       final service = NotificationService.instance;
       
-      // This should not throw even though we haven't initialized
-      // The service should handle gracefully by returning early from cancelNotification
+      // This should not throw even if initialization fails
+      // When not initialized and empty list provided, it returns early gracefully
       await expectLater(
         service.updateNotification([]),
         completes,
