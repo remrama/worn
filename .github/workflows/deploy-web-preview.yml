@@ -24,6 +24,12 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      # Note: Icon generation step not needed for web builds
+      # Web icons are already present in web/icons/ directory
+
+      - name: Run tests
+        run: flutter test
+
       - name: Build web
         run: flutter build web --release --base-href=/
 
@@ -42,13 +48,15 @@ jobs:
         with:
           script: |
             const previewUrl = '${{ steps.vercel-deploy.outputs.preview-url }}';
-            const commentBody = `## 🚀 Web Preview Deployed!
-
-            Your changes have been deployed to Vercel:
-
-            🔗 **Preview URL:** ${previewUrl}
-
-            This preview will be automatically updated when you push new commits to this PR.`;
+            const commentBody = [
+              '## 🚀 Web Preview Deployed!',
+              '',
+              'Your changes have been deployed to Vercel:',
+              '',
+              `🔗 **Preview URL:** ${previewUrl}`,
+              '',
+              'This preview will be automatically updated when you push new commits to this PR.',
+            ].join('\n');
 
             // Find existing comment
             const { data: comments } = await github.rest.issues.listComments({
