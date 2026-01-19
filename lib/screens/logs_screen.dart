@@ -18,7 +18,7 @@ class LogsScreen extends StatefulWidget {
 
 class _LogsScreenState extends State<LogsScreen> {
   static const String _trackingPausedMessage =
-      'Only device configurations can be updated while tracking is paused.';
+      'Only device configurations and notes can be updated while tracking is paused.';
 
   List<Device> _devices = [];
   List<Event> _events = [];
