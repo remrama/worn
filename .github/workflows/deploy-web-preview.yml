@@ -3,12 +3,11 @@ name: Deploy Web Preview
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, ready_for_review]
+    types: [opened, synchronize, reopened]
 
 jobs:
   deploy-preview:
     runs-on: ubuntu-latest
-    if: github.event.pull_request.draft == false
 
     permissions:
       contents: read
