@@ -51,19 +51,20 @@ class LogService {
   }
 
   Future<void> logDeviceEdited(Device oldDevice, Device newDevice) async {
-    final changes = <String>[];
     if (oldDevice.name != newDevice.name) {
-      changes.add('name:${newDevice.name}');
+      await _append(
+        '${_timestamp()}\tDEVICE_NAME_UPDATED\t${newDevice.id}\t${newDevice.name}',
+      );
     }
     if (oldDevice.deviceType != newDevice.deviceType) {
-      changes.add('deviceType:${newDevice.deviceType.name}');
+      await _append(
+        '${_timestamp()}\tDEVICE_TYPE_UPDATED\t${newDevice.id}\t${newDevice.name}\t${newDevice.deviceType.name}',
+      );
     }
     if (oldDevice.serialNumber != newDevice.serialNumber) {
-      changes.add('sn:${newDevice.serialNumber ?? "none"}');
-    }
-    if (changes.isNotEmpty) {
+      final sn = newDevice.serialNumber ?? 'none';
       await _append(
-        '${_timestamp()}\tDEVICE_EDITED\t${newDevice.id}\t${changes.join(",")}',
+        '${_timestamp()}\tDEVICE_SN_UPDATED\t${newDevice.id}\t${newDevice.name}\t$sn',
       );
     }
   }
@@ -76,20 +77,20 @@ class LogService {
 
   Future<void> logStatusChanged(Device device, DeviceStatus newStatus) async {
     await _append(
-      '${_timestamp()}\tSTATUS_CHANGED\t${device.id}\t${device.name}\t${newStatus.name}',
+      '${_timestamp()}\tDEVICE_STATUS_UPDATED\t${device.id}\t${device.name}\t${newStatus.name}',
     );
   }
 
   Future<void> logLocationChanged(Device device, DeviceLocation newLocation) async {
     await _append(
-      '${_timestamp()}\tLOCATION_CHANGED\t${device.id}\t${device.name}\t${newLocation.name}',
+      '${_timestamp()}\tDEVICE_LOCATION_UPDATED\t${device.id}\t${device.name}\t${newLocation.name}',
     );
   }
 
   Future<void> logDevicePowerChanged(Device device, bool isPoweredOn) async {
     final powerState = isPoweredOn ? 'on' : 'off';
     await _append(
-      '${_timestamp()}\tPOWER_CHANGED\t${device.id}\t${device.name}\t$powerState',
+      '${_timestamp()}\tDEVICE_POWER_UPDATED\t${device.id}\t${device.name}\t$powerState',
     );
   }
 

@@ -126,9 +126,12 @@ Uses `SharedPreferences` with these keys:
 Tab-separated entries with UTC ISO 8601 timestamps. Time windows use `..` separator. Uses internal variable names for parsing efficiency:
 ```
 2024-01-15T10:30:00.000Z	DEVICE_ADDED	uuid	MyWatch	watch	loose	leftWrist	SN123	on
-2024-01-15T10:35:00.000Z	STATUS_CHANGED	uuid	MyWatch	worn
-2024-01-15T10:36:00.000Z	LOCATION_CHANGED	uuid	MyWatch	rightWrist
-2024-01-15T10:40:00.000Z	POWER_CHANGED	uuid	MyWatch	off
+2024-01-15T10:32:00.000Z	DEVICE_NAME_UPDATED	uuid	MyWatchRenamed
+2024-01-15T10:33:00.000Z	DEVICE_TYPE_UPDATED	uuid	MyWatchRenamed	wristband
+2024-01-15T10:34:00.000Z	DEVICE_SN_UPDATED	uuid	MyWatchRenamed	SN456
+2024-01-15T10:35:00.000Z	DEVICE_STATUS_UPDATED	uuid	MyWatchRenamed	worn
+2024-01-15T10:36:00.000Z	DEVICE_LOCATION_UPDATED	uuid	MyWatchRenamed	rightWrist
+2024-01-15T10:40:00.000Z	DEVICE_POWER_UPDATED	uuid	MyWatchRenamed	off
 2024-01-15T11:00:00.000Z	EVENT_STARTED	uuid	walk	2024-01-15T11:00:00.000Z
 2024-01-15T11:30:00.000Z	EVENT_STOPPED	uuid	walk	2024-01-15T11:00:00.000Z	2024-01-15T11:25:00.000Z..2024-01-15T11:30:00.000Z
 2024-01-15T12:00:00.000Z	NOTE	User added a custom note
@@ -136,7 +139,7 @@ Tab-separated entries with UTC ISO 8601 timestamps. Time windows use `..` separa
 2024-01-15T12:10:00.000Z	NOTE	eventId	Walk	Event-specific note
 2024-01-15T18:00:00.000Z	TRACKING_PAUSED
 2024-01-17T09:00:00.000Z	TRACKING_RESUMED
-2024-01-17T09:05:00.000Z	POWER_CHANGED	uuid	MyWatch	on
+2024-01-17T09:05:00.000Z	DEVICE_POWER_UPDATED	uuid	MyWatch	on
 ```
 
 ## Testing
