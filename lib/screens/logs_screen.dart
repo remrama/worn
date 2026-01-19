@@ -56,17 +56,10 @@ class _LogsScreenState extends State<LogsScreen> {
         await LogService.instance.logDeviceAdded(result);
         _load();
       } catch (e) {
-        if (mounted) {
-          await showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Error'),
-              content: const Text('Device name must be unique and cannot be the same as any active device.'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
-              ],
-            ),
-          );
+        if (e.toString().contains('Device name must be unique')) {
+          _showDuplicateNameError();
+        } else {
+          rethrow;
         }
       }
     }
@@ -83,19 +76,27 @@ class _LogsScreenState extends State<LogsScreen> {
         await LogService.instance.logDeviceEdited(device, result);
         _load();
       } catch (e) {
-        if (mounted) {
-          await showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              title: const Text('Error'),
-              content: const Text('Device name must be unique and cannot be the same as any active device.'),
-              actions: [
-                TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
-              ],
-            ),
-          );
+        if (e.toString().contains('Device name must be unique')) {
+          _showDuplicateNameError();
+        } else {
+          rethrow;
         }
       }
+    }
+  }
+
+  Future<void> _showDuplicateNameError() async {
+    if (mounted) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Error'),
+          content: const Text('Device name must be unique and cannot be the same as any active device.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
     }
   }
 
