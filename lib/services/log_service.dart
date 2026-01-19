@@ -53,44 +53,44 @@ class LogService {
   Future<void> logDeviceEdited(Device oldDevice, Device newDevice) async {
     if (oldDevice.name != newDevice.name) {
       await _append(
-        '${_timestamp()}\tDEVICE_NAME_UPDATED\t${newDevice.id}\t${newDevice.name}',
+        '${_timestamp()}\tDEVICE_NAME_UPDATED\t${newDevice.id}\t"${newDevice.name}"',
       );
     }
     if (oldDevice.deviceType != newDevice.deviceType) {
       await _append(
-        '${_timestamp()}\tDEVICE_TYPE_UPDATED\t${newDevice.id}\t${newDevice.name}\t${newDevice.deviceType.name}',
+        '${_timestamp()}\tDEVICE_TYPE_UPDATED\t${newDevice.id}\t"${newDevice.name}"\t${newDevice.deviceType.name}',
       );
     }
     if (oldDevice.serialNumber != newDevice.serialNumber) {
       final sn = newDevice.serialNumber ?? 'none';
       await _append(
-        '${_timestamp()}\tDEVICE_SN_UPDATED\t${newDevice.id}\t${newDevice.name}\t$sn',
+        '${_timestamp()}\tDEVICE_SN_UPDATED\t${newDevice.id}\t"${newDevice.name}"\t$sn',
       );
     }
   }
 
   Future<void> logDeviceDeleted(Device device) async {
     await _append(
-      '${_timestamp()}\tDEVICE_DELETED\t${device.id}\t${device.name}',
+      '${_timestamp()}\tDEVICE_DELETED\t${device.id}\t"${device.name}"',
     );
   }
 
   Future<void> logStatusChanged(Device device, DeviceStatus newStatus) async {
     await _append(
-      '${_timestamp()}\tDEVICE_STATUS_UPDATED\t${device.id}\t${device.name}\t${newStatus.name}',
+      '${_timestamp()}\tDEVICE_STATUS_UPDATED\t${device.id}\t"${device.name}"\t${newStatus.name}',
     );
   }
 
   Future<void> logLocationChanged(Device device, DeviceLocation newLocation) async {
     await _append(
-      '${_timestamp()}\tDEVICE_LOCATION_UPDATED\t${device.id}\t${device.name}\t${newLocation.name}',
+      '${_timestamp()}\tDEVICE_LOCATION_UPDATED\t${device.id}\t"${device.name}"\t${newLocation.name}',
     );
   }
 
   Future<void> logDevicePowerChanged(Device device, bool isPoweredOn) async {
     final powerState = isPoweredOn ? 'on' : 'off';
     await _append(
-      '${_timestamp()}\tDEVICE_POWER_UPDATED\t${device.id}\t${device.name}\t$powerState',
+      '${_timestamp()}\tDEVICE_POWER_UPDATED\t${device.id}\t"${device.name}"\t$powerState',
     );
   }
 

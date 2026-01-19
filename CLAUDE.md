@@ -126,12 +126,12 @@ Uses `SharedPreferences` with these keys:
 Tab-separated entries with UTC ISO 8601 timestamps. Time windows use `..` separator. Uses internal variable names for parsing efficiency:
 ```
 2024-01-15T10:30:00.000Z	DEVICE_ADDED	uuid	name="MyWatch"	type=watch	status=loose	location=leftWrist	sn=SN123	power=on
-2024-01-15T10:32:00.000Z	DEVICE_NAME_UPDATED	uuid	MyWatchRenamed
-2024-01-15T10:33:00.000Z	DEVICE_TYPE_UPDATED	uuid	MyWatchRenamed	wristband
-2024-01-15T10:34:00.000Z	DEVICE_SN_UPDATED	uuid	MyWatchRenamed	SN456
-2024-01-15T10:35:00.000Z	DEVICE_STATUS_UPDATED	uuid	MyWatchRenamed	worn
-2024-01-15T10:36:00.000Z	DEVICE_LOCATION_UPDATED	uuid	MyWatchRenamed	rightWrist
-2024-01-15T10:40:00.000Z	DEVICE_POWER_UPDATED	uuid	MyWatchRenamed	off
+2024-01-15T10:32:00.000Z	DEVICE_NAME_UPDATED	uuid	"My Watch Renamed"
+2024-01-15T10:33:00.000Z	DEVICE_TYPE_UPDATED	uuid	"My Watch Renamed"	wristband
+2024-01-15T10:34:00.000Z	DEVICE_SN_UPDATED	uuid	"My Watch Renamed"	SN456
+2024-01-15T10:35:00.000Z	DEVICE_STATUS_UPDATED	uuid	"My Watch Renamed"	worn
+2024-01-15T10:36:00.000Z	DEVICE_LOCATION_UPDATED	uuid	"My Watch Renamed"	rightWrist
+2024-01-15T10:40:00.000Z	DEVICE_POWER_UPDATED	uuid	"My Watch Renamed"	off
 2024-01-15T11:00:00.000Z	EVENT_STARTED	uuid	walk	2024-01-15T11:00:00.000Z
 2024-01-15T11:30:00.000Z	EVENT_STOPPED	uuid	walk	2024-01-15T11:00:00.000Z	2024-01-15T11:25:00.000Z..2024-01-15T11:30:00.000Z
 2024-01-15T12:00:00.000Z	NOTE	User added a custom note
