@@ -30,7 +30,6 @@ void main() {
       expect(logLine, contains('EVENT_CANCELLED'));
       expect(logLine, contains('test-event-id'));
       expect(logLine, contains('inBed'));
-      expect(logLine, contains('In Bed'));
       expect(logLine, contains('2024-01-15T22:00:00.000Z'));
     });
 
@@ -66,13 +65,13 @@ void main() {
       
       // Verify it's a cancellation
       expect(logLine, contains('EVENT_CANCELLED'));
-      
-      // Count tab-separated fields - should have 6 fields for cancelled events
-      // (timestamp, event_type, id, type, displayName, startWindow)
+
+      // Count tab-separated fields - should have 5 fields for cancelled events
+      // (timestamp, event_type, id, type, startWindow)
       final fields = logLine.split('\t');
-      expect(fields.length, 6);
-      
-      // Verify no stop window (EVENT_STOPPED would have 7 fields)
+      expect(fields.length, 5);
+
+      // Verify no stop window (EVENT_STOPPED would have 6 fields)
       expect(logLine, isNot(contains('STOPPED')));
     });
   });

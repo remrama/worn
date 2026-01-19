@@ -45,17 +45,20 @@ class LogService {
   Future<void> logDeviceAdded(Device device) async {
     final sn = device.serialNumber ?? 'none';
     await _append(
-      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\t${device.name}\t${device.location.name}\t$sn',
+      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\t${device.name}\t${device.deviceType.name}\t${device.location.name}\t$sn',
     );
   }
 
   Future<void> logDeviceEdited(Device oldDevice, Device newDevice) async {
     final changes = <String>[];
     if (oldDevice.name != newDevice.name) {
-      changes.add('name:${oldDevice.name}->${newDevice.name}');
+      changes.add('name:${newDevice.name}');
+    }
+    if (oldDevice.deviceType != newDevice.deviceType) {
+      changes.add('deviceType:${newDevice.deviceType.name}');
     }
     if (oldDevice.serialNumber != newDevice.serialNumber) {
-      changes.add('sn:${oldDevice.serialNumber ?? "none"}->${newDevice.serialNumber ?? "none"}');
+      changes.add('sn:${newDevice.serialNumber ?? "none"}');
     }
     if (changes.isNotEmpty) {
       await _append(
@@ -72,14 +75,16 @@ class LogService {
 
   Future<void> logLocationChanged(Device device, DeviceLocation oldLocation, DeviceLocation newLocation) async {
     await _append(
-      '${_timestamp()}\tLOCATION_CHANGED\t${device.id}\t${device.name}\t${oldLocation.name}->${newLocation.name}',
+      '${_timestamp()}\tLOCATION_CHANGED\t${device.id}\t${device.name}\t${newLocation.name}',
     );
   }
 
-  Future<void> logNote(String note, {Device? device}) async {
+  Future<void> logNote(String note, {Device? device, Event? event}) async {
     final sanitized = note.replaceAll('\t', ' ').replaceAll('\n', ' ');
     if (device != null) {
       await _append('${_timestamp()}\tNOTE\t${device.id}\t${device.name}\t$sanitized');
+    } else if (event != null) {
+      await _append('${_timestamp()}\tNOTE\t${event.id}\t${event.displayName}\t$sanitized');
     } else {
       await _append('${_timestamp()}\tNOTE\t$sanitized');
     }
@@ -95,7 +100,7 @@ class LogService {
   Future<void> logEventStarted(Event event) async {
     final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
     await _append(
-      '${_timestamp()}\tEVENT_STARTED\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow',
+      '${_timestamp()}\tEVENT_STARTED\t${event.id}\t${event.type.name}\t$startWindow',
     );
   }
 
@@ -107,14 +112,14 @@ class LogService {
     final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
     final stopWindow = _formatTimeWindow(stopEarliest, stopLatest);
     await _append(
-      '${_timestamp()}\tEVENT_STOPPED\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow\t$stopWindow',
+      '${_timestamp()}\tEVENT_STOPPED\t${event.id}\t${event.type.name}\t$startWindow\t$stopWindow',
     );
   }
 
   Future<void> logEventCancelled(Event event) async {
     final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
     await _append(
-      '${_timestamp()}\tEVENT_CANCELLED\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow',
+      '${_timestamp()}\tEVENT_CANCELLED\t${event.id}\t${event.type.name}\t$startWindow',
     );
   }
 
@@ -126,7 +131,7 @@ class LogService {
     final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
     final stopWindow = _formatTimeWindow(stopEarliest, stopLatest);
     await _append(
-      '${_timestamp()}\tEVENT_RETROACTIVE\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow\t$stopWindow',
+      '${_timestamp()}\tEVENT_RETROACTIVE\t${event.id}\t${event.type.name}\t$startWindow\t$stopWindow',
     );
   }
 

@@ -4,7 +4,7 @@ class TrackingService {
   static const _key = 'worn_tracking';
   static TrackingService? _instance;
   SharedPreferences? _prefs;
-  bool _isTracking = true;
+  bool _isTracking = false;
 
   TrackingService._();
 
@@ -24,7 +24,7 @@ class TrackingService {
   Future<void> _ensureLoaded() async {
     if (_prefs != null) return;
     _prefs = await SharedPreferences.getInstance();
-    _isTracking = _prefs!.getBool(_key) ?? true;
+    _isTracking = _prefs!.getBool(_key) ?? false;
   }
 
   Future<bool> isTracking() async {

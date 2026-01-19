@@ -93,10 +93,6 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _editDevice(Device device) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final result = await showDialog<Device>(
       context: context,
       builder: (ctx) => DeviceDialog(device: device),
@@ -104,7 +100,9 @@ class _LogsScreenState extends State<LogsScreen> {
     if (result != null) {
       try {
         await DeviceStore.instance.updateDevice(result);
-        await LogService.instance.logDeviceEdited(device, result);
+        if (_isTracking) {
+          await LogService.instance.logDeviceEdited(device, result);
+        }
         _load();
       } catch (e) {
         if (e.toString().contains('Device name must be unique')) {
@@ -176,7 +174,10 @@ class _LogsScreenState extends State<LogsScreen> {
     }
     final newLocation = await showDialog<DeviceLocation>(
       context: context,
-      builder: (ctx) => LocationPickerDialog(currentLocation: device.location),
+      builder: (ctx) => LocationPickerDialog(
+        currentLocation: device.location,
+        deviceType: device.deviceType,
+      ),
     );
     if (newLocation != null && newLocation != device.location) {
       final oldLocation = device.location;
@@ -198,6 +199,20 @@ class _LogsScreenState extends State<LogsScreen> {
     );
     if (note != null && note.trim().isNotEmpty) {
       await LogService.instance.logNote(note.trim(), device: device);
+    }
+  }
+
+  Future<void> _addEventNote(Event event) async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
+    final note = await showDialog<String>(
+      context: context,
+      builder: (ctx) => NoteDialog(eventName: event.displayName),
+    );
+    if (note != null && note.trim().isNotEmpty) {
+      await LogService.instance.logNote(note.trim(), event: event);
     }
   }
 
@@ -400,6 +415,7 @@ class _LogsScreenState extends State<LogsScreen> {
             )
           else
             ..._devices.map((d) => ListTile(
+                  leading: Icon(Device.iconFor(d.deviceType)),
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -460,6 +476,11 @@ class _LogsScreenState extends State<LogsScreen> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
+                      icon: const Icon(Icons.note_add, size: 20),
+                      onPressed: () => _addEventNote(e),
+                      tooltip: 'Add note',
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.cancel, color: Colors.orange),
                       onPressed: () => _cancelEvent(e),
                       tooltip: 'Cancel',
@@ -493,7 +514,7 @@ class _LogsScreenState extends State<LogsScreen> {
             child: const Icon(Icons.event),
           ),
           const SizedBox(height: 8),
-          FloatingActionButton(
+          FloatingActionButton.small(
             heroTag: 'device',
             onPressed: _addDevice,
             tooltip: 'Add device',
@@ -517,6 +538,7 @@ class DeviceDialog extends StatefulWidget {
 class _DeviceDialogState extends State<DeviceDialog> {
   final _nameController = TextEditingController();
   final _snController = TextEditingController();
+  late DeviceType _selectedType;
 
   @override
   void initState() {
@@ -524,6 +546,9 @@ class _DeviceDialogState extends State<DeviceDialog> {
     if (widget.device != null) {
       _nameController.text = widget.device!.name;
       _snController.text = widget.device!.serialNumber ?? '';
+      _selectedType = widget.device!.deviceType;
+    } else {
+      _selectedType = DeviceType.watch;
     }
   }
 
@@ -538,10 +563,23 @@ class _DeviceDialogState extends State<DeviceDialog> {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
     final sn = _snController.text.trim();
+
+    // Preserve existing location only if it's valid for the selected type,
+    // otherwise fall back to a safe default.
+    DeviceLocation location = DeviceLocation.loose;
+    if (widget.device != null) {
+      final existingLocation = widget.device!.location;
+      final availableLocations = Device.availableLocationsFor(_selectedType);
+      if (availableLocations.contains(existingLocation)) {
+        location = existingLocation;
+      }
+    }
+
     final device = Device(
       id: widget.device?.id,
       name: name,
-      location: widget.device?.location ?? DeviceLocation.loose,
+      deviceType: _selectedType,
+      location: location,
       serialNumber: sn.isEmpty ? null : sn,
     );
     Navigator.pop(context, device);
@@ -558,8 +596,30 @@ class _DeviceDialogState extends State<DeviceDialog> {
           children: [
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Name (required, unique)'),
+              decoration: const InputDecoration(labelText: 'Name'),
               autofocus: true,
+            ),
+            const SizedBox(height: 12),
+            DropdownButtonFormField<DeviceType>(
+              initialValue: _selectedType,
+              decoration: const InputDecoration(labelText: 'Device Type'),
+              items: DeviceType.values.map((type) {
+                return DropdownMenuItem(
+                  value: type,
+                  child: Row(
+                    children: [
+                      Icon(Device.iconFor(type), size: 20),
+                      const SizedBox(width: 8),
+                      Text(Device.typeLabel(type)),
+                    ],
+                  ),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _selectedType = value);
+                }
+              },
             ),
             const SizedBox(height: 12),
             TextField(
@@ -579,19 +639,25 @@ class _DeviceDialogState extends State<DeviceDialog> {
 
 class LocationPickerDialog extends StatelessWidget {
   final DeviceLocation currentLocation;
-  const LocationPickerDialog({super.key, required this.currentLocation});
+  final DeviceType deviceType;
+  const LocationPickerDialog({
+    super.key,
+    required this.currentLocation,
+    required this.deviceType,
+  });
 
   @override
   Widget build(BuildContext context) {
+    final availableLocations = Device.availableLocationsFor(deviceType);
     return AlertDialog(
       title: const Text('Set Location'),
       content: SizedBox(
         width: double.maxFinite,
         child: ListView.builder(
           shrinkWrap: true,
-          itemCount: DeviceLocation.values.length,
+          itemCount: availableLocations.length,
           itemBuilder: (ctx, i) {
-            final loc = DeviceLocation.values[i];
+            final loc = availableLocations[i];
             final isSelected = loc == currentLocation;
             return ListTile(
               title: Text(Device.locationLabel(loc)),
@@ -610,7 +676,8 @@ class LocationPickerDialog extends StatelessWidget {
 
 class NoteDialog extends StatefulWidget {
   final String? deviceName;
-  const NoteDialog({super.key, this.deviceName});
+  final String? eventName;
+  const NoteDialog({super.key, this.deviceName, this.eventName});
 
   @override
   State<NoteDialog> createState() => _NoteDialogState();
@@ -631,7 +698,11 @@ class _NoteDialogState extends State<NoteDialog> {
 
   @override
   Widget build(BuildContext context) {
-    final title = widget.deviceName != null ? 'Note for ${widget.deviceName}' : 'Add Note';
+    final title = widget.deviceName != null
+        ? 'Note for ${widget.deviceName}'
+        : widget.eventName != null
+            ? 'Note for ${widget.eventName}'
+            : 'Add Global Note';
     return AlertDialog(
       title: Text(title),
       content: TextField(
@@ -1007,7 +1078,6 @@ class StopEventDialog extends StatefulWidget {
 }
 
 class _StopEventDialogState extends State<StopEventDialog> {
-  bool _useWindow = false;
   late DateTime _earliestDate;
   late DateTime _latestDate;
   late TimeOfDay _earliestTime;
@@ -1074,14 +1144,9 @@ class _StopEventDialogState extends State<StopEventDialog> {
   }
 
   void _submit() {
-    if (_useWindow) {
-      final earliest = _combineDateTime(_earliestDate, _earliestTime);
-      final latest = _combineDateTime(_latestDate, _latestTime);
-      Navigator.pop(context, StopEventResult(stopEarliest: earliest, stopLatest: latest));
-    } else {
-      final stopTime = DateTime.now().toUtc();
-      Navigator.pop(context, StopEventResult(stopEarliest: stopTime, stopLatest: stopTime));
-    }
+    final earliest = _combineDateTime(_earliestDate, _earliestTime);
+    final latest = _combineDateTime(_latestDate, _latestTime);
+    Navigator.pop(context, StopEventResult(stopEarliest: earliest, stopLatest: latest));
   }
 
   @override
@@ -1093,58 +1158,48 @@ class _StopEventDialogState extends State<StopEventDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            CheckboxListTile(
-              title: const Text('Estimate stop time'),
-              subtitle: const Text('Enter a time window instead of now'),
-              value: _useWindow,
-              onChanged: (v) => setState(() => _useWindow = v ?? false),
-              contentPadding: EdgeInsets.zero,
+            const Text('Earliest stop:', style: TextStyle(fontWeight: FontWeight.bold)),
+            Row(
+              children: [
+                Expanded(
+                  child: ListTile(
+                    title: Text(_formatDate(_earliestDate)),
+                    leading: const Icon(Icons.calendar_today, size: 20),
+                    onTap: () => _pickDate(true),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+                Expanded(
+                  child: ListTile(
+                    title: Text(_formatTimeOfDay(_earliestTime)),
+                    leading: const Icon(Icons.access_time, size: 20),
+                    onTap: () => _pickTime(true),
+                    contentPadding: EdgeInsets.zero,
+                  ),
+                ),
+              ],
             ),
-            if (_useWindow) ...[
-              const SizedBox(height: 16),
-              const Text('Earliest stop:', style: TextStyle(fontWeight: FontWeight.bold)),
-              Row(
-                children: [
-                  Expanded(
-                    child: ListTile(
-                      title: Text(_formatDate(_earliestDate)),
-                      leading: const Icon(Icons.calendar_today, size: 20),
-                      onTap: () => _pickDate(true),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+            const Text('Latest stop:', style: TextStyle(fontWeight: FontWeight.bold)),
+            Row(
+              children: [
+                Expanded(
+                  child: ListTile(
+                    title: Text(_formatDate(_latestDate)),
+                    leading: const Icon(Icons.calendar_today, size: 20),
+                    onTap: () => _pickDate(false),
+                    contentPadding: EdgeInsets.zero,
                   ),
-                  Expanded(
-                    child: ListTile(
-                      title: Text(_formatTimeOfDay(_earliestTime)),
-                      leading: const Icon(Icons.access_time, size: 20),
-                      onTap: () => _pickTime(true),
-                      contentPadding: EdgeInsets.zero,
-                    ),
+                ),
+                Expanded(
+                  child: ListTile(
+                    title: Text(_formatTimeOfDay(_latestTime)),
+                    leading: const Icon(Icons.access_time, size: 20),
+                    onTap: () => _pickTime(false),
+                    contentPadding: EdgeInsets.zero,
                   ),
-                ],
-              ),
-              const Text('Latest stop:', style: TextStyle(fontWeight: FontWeight.bold)),
-              Row(
-                children: [
-                  Expanded(
-                    child: ListTile(
-                      title: Text(_formatDate(_latestDate)),
-                      leading: const Icon(Icons.calendar_today, size: 20),
-                      onTap: () => _pickDate(false),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                  Expanded(
-                    child: ListTile(
-                      title: Text(_formatTimeOfDay(_latestTime)),
-                      leading: const Icon(Icons.access_time, size: 20),
-                      onTap: () => _pickTime(false),
-                      contentPadding: EdgeInsets.zero,
-                    ),
-                  ),
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ],
         ),
       ),
