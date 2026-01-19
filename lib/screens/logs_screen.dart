@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/device.dart';
 import '../models/event.dart';
 import '../services/device_store.dart';
@@ -680,6 +681,7 @@ class _DeviceDialogState extends State<DeviceDialog> {
             TextField(
               controller: _snController,
               decoration: const InputDecoration(labelText: 'Serial Number (optional)'),
+              inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
             ),
             const SizedBox(height: 16),
             const Divider(),
