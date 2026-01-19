@@ -17,8 +17,8 @@ class LogsScreen extends StatefulWidget {
 
 class _LogsScreenState extends State<LogsScreen> {
   static const String _trackingPausedMessage =
-      'Tracking is paused. Status changes, events, and notes require tracking to be enabled.';
-  
+      'Only device configurations can be updated while tracking is paused.';
+
   List<Device> _devices = [];
   List<Event> _events = [];
   bool _loading = true;
@@ -56,6 +56,22 @@ class _LogsScreenState extends State<LogsScreen> {
 
   Future<void> _toggleTracking() async {
     final newValue = !_isTracking;
+    // Prevent turning off tracking while events are active
+    if (!newValue && _events.isNotEmpty) {
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Active Events'),
+            content: const Text('Tracking cannot be paused while an event is active.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+            ],
+          ),
+        );
+      }
+      return;
+    }
     await TrackingService.instance.setTracking(newValue);
     if (newValue) {
       await LogService.instance.logTrackingResumed();
@@ -91,7 +107,7 @@ class _LogsScreenState extends State<LogsScreen> {
   Future<void> _editDevice(Device device) async {
     final result = await showDialog<DeviceDialogResult>(
       context: context,
-      builder: (ctx) => DeviceDialog(device: device, isTracking: _isTracking),
+      builder: (ctx) => DeviceDialog(device: device),
     );
     if (result == null) return;
 
@@ -160,10 +176,6 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _addDeviceNote(Device device) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final note = await showDialog<String>(
       context: context,
       builder: (ctx) => NoteDialog(deviceName: device.name),
@@ -174,10 +186,6 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _addEventNote(Event event) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final note = await showDialog<String>(
       context: context,
       builder: (ctx) => NoteDialog(eventName: event.displayName),
@@ -213,10 +221,6 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _stopEvent(Event event) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final result = await showDialog<StopEventResult>(
       context: context,
       builder: (ctx) => StopEventDialog(event: event),
@@ -233,10 +237,6 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _cancelEvent(Event event) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -257,10 +257,6 @@ class _LogsScreenState extends State<LogsScreen> {
 
   // Note method
   Future<void> _addNote() async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final note = await showDialog<String>(
       context: context,
       builder: (ctx) => const NoteDialog(),
@@ -513,8 +509,7 @@ class DeviceDialogResult {
 // Device dialogs
 class DeviceDialog extends StatefulWidget {
   final Device? device;
-  final bool isTracking;
-  const DeviceDialog({super.key, this.device, this.isTracking = true});
+  const DeviceDialog({super.key, this.device});
 
   @override
   State<DeviceDialog> createState() => _DeviceDialogState();
@@ -636,10 +631,7 @@ class _DeviceDialogState extends State<DeviceDialog> {
             ),
             const SizedBox(height: 12),
             InputDecorator(
-              decoration: InputDecoration(
-                labelText: 'Body Location',
-                helperText: (isEdit && !widget.isTracking) ? 'Enable tracking to change' : null,
-              ),
+              decoration: const InputDecoration(labelText: 'Body Location'),
               child: DropdownButton<DeviceLocation>(
                 value: _selectedLocation,
                 isExpanded: true,
@@ -650,14 +642,11 @@ class _DeviceDialogState extends State<DeviceDialog> {
                     child: Text(Device.locationLabel(loc)),
                   );
                 }).toList(),
-                // Disable location changes when editing with tracking paused
-                onChanged: (isEdit && !widget.isTracking)
-                    ? null
-                    : (value) {
-                        if (value != null) {
-                          setState(() => _selectedLocation = value);
-                        }
-                      },
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedLocation = value);
+                  }
+                },
               ),
             ),
             if (!isEdit) ...[
