@@ -5,6 +5,7 @@ import '../models/event.dart';
 import '../services/device_store.dart';
 import '../services/event_store.dart';
 import '../services/log_service.dart';
+import '../services/notification_service.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
@@ -42,6 +43,8 @@ class _LogsScreenState extends State<LogsScreen> {
       _events = events;
       _loading = false;
     });
+    // Update notification with current events (in case durations changed)
+    await NotificationService.instance.updateNotification(events);
   }
 
   // Device methods
