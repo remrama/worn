@@ -105,15 +105,7 @@ class _LogsScreenState extends State<LogsScreen> {
     if (result.device != null) {
       try {
         await DeviceStore.instance.updateDevice(result.device!);
-        await LogService.instance.logDeviceEdited(device, result.device!);
-        // Log power change separately if it changed
-        if (device.isPoweredOn != result.device!.isPoweredOn) {
-          await LogService.instance.logDevicePowerChanged(result.device!, result.device!.isPoweredOn);
-        }
-        // Log location change separately if it changed
-        if (device.location != result.device!.location) {
-          await LogService.instance.logLocationChanged(result.device!, result.device!.location);
-        }
+        await LogService.instance.logDeviceUpdated(device, result.device!);
         _load();
       } catch (e) {
         if (e.toString().contains('Device name must be unique')) {
@@ -163,7 +155,7 @@ class _LogsScreenState extends State<LogsScreen> {
     if (newStatus == device.status) return;
     final updated = device.copyWith(status: newStatus);
     await DeviceStore.instance.updateDevice(updated);
-    await LogService.instance.logStatusChanged(device, newStatus);
+    await LogService.instance.logDeviceUpdated(device, updated);
     _load();
   }
 
