@@ -28,11 +28,11 @@ void main() {
       final service = NotificationService.instance;
       
       // This should not throw even though we haven't initialized
-      // The service should handle gracefully
-      await service.updateNotification([]);
-      
-      // If we get here without exception, the test passes
-      expect(true, true);
+      // The service should handle gracefully by returning early from cancelNotification
+      await expectLater(
+        service.updateNotification([]),
+        completes,
+      );
     });
 
     test('duration formatting - less than 1 hour shows only minutes', () {
