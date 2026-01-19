@@ -340,9 +340,9 @@ class _LogsScreenState extends State<LogsScreen> {
       borderRadius: BorderRadius.circular(4),
       selectedColor: Colors.white,
       fillColor: d.status == DeviceStatus.worn
-          ? Colors.green
+          ? Colors.orange
           : d.status == DeviceStatus.charging
-              ? Colors.orange
+              ? Colors.green
               : Colors.grey,
       children: const [
         Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('W', style: TextStyle(fontSize: 12))),
