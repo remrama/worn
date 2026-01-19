@@ -62,13 +62,12 @@ class Device {
   Device({
     String? id,
     required this.name,
-    DeviceType deviceType = DeviceType.watch,
+    this.deviceType = DeviceType.watch,
     this.status = DeviceStatus.loose,
     DeviceLocation? location,
     this.serialNumber,
     this.isPoweredOn = true,
   }) : id = id ?? const Uuid().v4(),
-       deviceType = deviceType,
        location = location ?? defaultLocationFor(deviceType);
 
   Device copyWith({

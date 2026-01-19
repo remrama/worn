@@ -616,49 +616,57 @@ class _DeviceDialogState extends State<DeviceDialog> {
               autofocus: true,
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<DeviceType>(
-              value: _selectedType,
+            InputDecorator(
               decoration: const InputDecoration(labelText: 'Device Type'),
-              items: DeviceType.values.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Row(
-                    children: [
-                      Icon(Device.iconFor(type), size: 20),
-                      const SizedBox(width: 8),
-                      Text(Device.typeLabel(type)),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _selectedType = value;
-                    // Reset location to default if current is not valid for new type
-                    final availableLocations = Device.availableLocationsFor(value);
-                    if (!availableLocations.contains(_selectedLocation)) {
-                      _selectedLocation = Device.defaultLocationFor(value);
-                    }
-                  });
-                }
-              },
+              child: DropdownButton<DeviceType>(
+                value: _selectedType,
+                isExpanded: true,
+                underline: const SizedBox(),
+                items: DeviceType.values.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Row(
+                      children: [
+                        Icon(Device.iconFor(type), size: 20),
+                        const SizedBox(width: 8),
+                        Text(Device.typeLabel(type)),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedType = value;
+                      // Reset location to default if current is not valid for new type
+                      final availableLocations = Device.availableLocationsFor(value);
+                      if (!availableLocations.contains(_selectedLocation)) {
+                        _selectedLocation = Device.defaultLocationFor(value);
+                      }
+                    });
+                  }
+                },
+              ),
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<DeviceLocation>(
-              value: _selectedLocation,
+            InputDecorator(
               decoration: const InputDecoration(labelText: 'Body Location'),
-              items: Device.availableLocationsFor(_selectedType).map((loc) {
-                return DropdownMenuItem(
-                  value: loc,
-                  child: Text(Device.locationLabel(loc)),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedLocation = value);
-                }
-              },
+              child: DropdownButton<DeviceLocation>(
+                value: _selectedLocation,
+                isExpanded: true,
+                underline: const SizedBox(),
+                items: Device.availableLocationsFor(_selectedType).map((loc) {
+                  return DropdownMenuItem(
+                    value: loc,
+                    child: Text(Device.locationLabel(loc)),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedLocation = value);
+                  }
+                },
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
