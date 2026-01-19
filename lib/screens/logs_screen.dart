@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../models/device.dart';
 import '../models/event.dart';
 import '../services/device_store.dart';
@@ -16,9 +17,9 @@ class LogsScreen extends StatefulWidget {
 }
 
 class _LogsScreenState extends State<LogsScreen> {
-  static const String _trackingPausedMessage = 
-      'Logging is currently paused. Enable tracking to add devices, events, or notes.';
-  
+  static const String _trackingPausedMessage =
+      'Only device configurations and notes can be updated while tracking is paused.';
+
   List<Device> _devices = [];
   List<Event> _events = [];
   bool _loading = true;
@@ -56,6 +57,22 @@ class _LogsScreenState extends State<LogsScreen> {
 
   Future<void> _toggleTracking() async {
     final newValue = !_isTracking;
+    // Prevent turning off tracking while events are active
+    if (!newValue && _events.isNotEmpty) {
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Active Events'),
+            content: const Text('Tracking cannot be paused while an event is active.'),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+            ],
+          ),
+        );
+      }
+      return;
+    }
     await TrackingService.instance.setTracking(newValue);
     if (newValue) {
       await LogService.instance.logTrackingResumed();
@@ -69,10 +86,6 @@ class _LogsScreenState extends State<LogsScreen> {
 
   // Device methods
   Future<void> _addDevice() async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final result = await showDialog<DeviceDialogResult>(
       context: context,
       builder: (ctx) => const DeviceDialog(),
@@ -100,10 +113,6 @@ class _LogsScreenState extends State<LogsScreen> {
     if (result == null) return;
 
     if (result.deleteRequested) {
-      if (!_isTracking) {
-        _showTrackingPausedWarning();
-        return;
-      }
       await DeviceStore.instance.deleteDevice(device.id);
       await LogService.instance.logDeviceDeleted(device);
       _load();
@@ -113,13 +122,7 @@ class _LogsScreenState extends State<LogsScreen> {
     if (result.device != null) {
       try {
         await DeviceStore.instance.updateDevice(result.device!);
-        if (_isTracking) {
-          await LogService.instance.logDeviceEdited(device, result.device!);
-          // Log power change separately if it changed, after the edit log
-          if (device.isPoweredOn != result.device!.isPoweredOn) {
-            await LogService.instance.logDevicePowerChanged(result.device!, result.device!.isPoweredOn);
-          }
-        }
+        await LogService.instance.logDeviceUpdated(device, result.device!);
         _load();
       } catch (e) {
         if (e.toString().contains('Device name must be unique')) {
@@ -161,32 +164,19 @@ class _LogsScreenState extends State<LogsScreen> {
     }
   }
 
-  Future<void> _changeLocation(Device device) async {
+  Future<void> _changeStatus(Device device, DeviceStatus newStatus) async {
     if (!_isTracking) {
       _showTrackingPausedWarning();
       return;
     }
-    final newLocation = await showDialog<DeviceLocation>(
-      context: context,
-      builder: (ctx) => LocationPickerDialog(
-        currentLocation: device.location,
-        deviceType: device.deviceType,
-      ),
-    );
-    if (newLocation != null && newLocation != device.location) {
-      final oldLocation = device.location;
-      final updated = device.copyWith(location: newLocation);
-      await DeviceStore.instance.updateDevice(updated);
-      await LogService.instance.logLocationChanged(device, oldLocation, newLocation);
-      _load();
-    }
+    if (newStatus == device.status) return;
+    final updated = device.copyWith(status: newStatus);
+    await DeviceStore.instance.updateDevice(updated);
+    await LogService.instance.logDeviceUpdated(device, updated);
+    _load();
   }
 
   Future<void> _addDeviceNote(Device device) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final note = await showDialog<String>(
       context: context,
       builder: (ctx) => NoteDialog(deviceName: device.name),
@@ -197,10 +187,6 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _addEventNote(Event event) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final note = await showDialog<String>(
       context: context,
       builder: (ctx) => NoteDialog(eventName: event.displayName),
@@ -236,10 +222,6 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _stopEvent(Event event) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final result = await showDialog<StopEventResult>(
       context: context,
       builder: (ctx) => StopEventDialog(event: event),
@@ -256,10 +238,6 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _cancelEvent(Event event) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -280,10 +258,6 @@ class _LogsScreenState extends State<LogsScreen> {
 
   // Note method
   Future<void> _addNote() async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final note = await showDialog<String>(
       context: context,
       builder: (ctx) => const NoteDialog(),
@@ -340,24 +314,30 @@ class _LogsScreenState extends State<LogsScreen> {
     return _formatTime(e.startEarliest);
   }
 
-  Widget _locationChip(Device d) {
-    Color color;
-    if (d.location == DeviceLocation.loose) {
-      color = Colors.grey;
-    } else if (d.location == DeviceLocation.charging) {
-      color = Colors.orange;
-    } else {
-      color = Colors.green;
-    }
-    return GestureDetector(
-      onTap: () => _changeLocation(d),
-      child: Chip(
-        label: Text(Device.locationLabel(d.location), style: const TextStyle(fontSize: 12)),
-        backgroundColor: color.withValues(alpha: 0.2),
-        side: BorderSide(color: color),
-        padding: EdgeInsets.zero,
-        visualDensity: VisualDensity.compact,
-      ),
+  Widget _statusToggle(Device d) {
+    return ToggleButtons(
+      isSelected: [
+        d.status == DeviceStatus.worn,
+        d.status == DeviceStatus.loose,
+        d.status == DeviceStatus.charging,
+      ],
+      onPressed: (index) {
+        final status = DeviceStatus.values[index];
+        _changeStatus(d, status);
+      },
+      constraints: const BoxConstraints(minWidth: 32, minHeight: 28),
+      borderRadius: BorderRadius.circular(4),
+      selectedColor: Colors.white,
+      fillColor: d.status == DeviceStatus.worn
+          ? Colors.orange
+          : d.status == DeviceStatus.charging
+              ? Colors.green
+              : Colors.grey,
+      children: const [
+        Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('W', style: TextStyle(fontSize: 12))),
+        Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('L', style: TextStyle(fontSize: 12))),
+        Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('C', style: TextStyle(fontSize: 12))),
+      ],
     );
   }
 
@@ -432,7 +412,7 @@ class _LogsScreenState extends State<LogsScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      _locationChip(d),
+                      _statusToggle(d),
                       IconButton(
                         icon: const Icon(Icons.note_add, size: 20),
                         onPressed: () => _addDeviceNote(d),
@@ -540,6 +520,8 @@ class _DeviceDialogState extends State<DeviceDialog> {
   final _nameController = TextEditingController();
   final _snController = TextEditingController();
   late DeviceType _selectedType;
+  late DeviceLocation _selectedLocation;
+  late DeviceStatus _selectedStatus;
   late bool _isPoweredOn;
 
   @override
@@ -549,9 +531,13 @@ class _DeviceDialogState extends State<DeviceDialog> {
       _nameController.text = widget.device!.name;
       _snController.text = widget.device!.serialNumber ?? '';
       _selectedType = widget.device!.deviceType;
+      _selectedLocation = widget.device!.location;
+      _selectedStatus = widget.device!.status;
       _isPoweredOn = widget.device!.isPoweredOn;
     } else {
       _selectedType = DeviceType.watch;
+      _selectedLocation = Device.defaultLocationFor(DeviceType.watch);
+      _selectedStatus = DeviceStatus.loose;
       _isPoweredOn = true;
     }
   }
@@ -568,22 +554,12 @@ class _DeviceDialogState extends State<DeviceDialog> {
     if (name.isEmpty) return;
     final sn = _snController.text.trim();
 
-    // Preserve existing location only if it's valid for the selected type,
-    // otherwise fall back to a safe default.
-    DeviceLocation location = DeviceLocation.loose;
-    if (widget.device != null) {
-      final existingLocation = widget.device!.location;
-      final availableLocations = Device.availableLocationsFor(_selectedType);
-      if (availableLocations.contains(existingLocation)) {
-        location = existingLocation;
-      }
-    }
-
     final device = Device(
       id: widget.device?.id,
       name: name,
       deviceType: _selectedType,
-      location: location,
+      status: widget.device?.status ?? _selectedStatus,
+      location: _selectedLocation,
       serialNumber: sn.isEmpty ? null : sn,
       isPoweredOn: _isPoweredOn,
     );
@@ -622,31 +598,90 @@ class _DeviceDialogState extends State<DeviceDialog> {
               autofocus: true,
             ),
             const SizedBox(height: 12),
-            DropdownButtonFormField<DeviceType>(
-              initialValue: _selectedType,
+            InputDecorator(
               decoration: const InputDecoration(labelText: 'Device Type'),
-              items: DeviceType.values.map((type) {
-                return DropdownMenuItem(
-                  value: type,
-                  child: Row(
-                    children: [
-                      Icon(Device.iconFor(type), size: 20),
-                      const SizedBox(width: 8),
-                      Text(Device.typeLabel(type)),
-                    ],
-                  ),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() => _selectedType = value);
-                }
-              },
+              child: DropdownButton<DeviceType>(
+                value: _selectedType,
+                isExpanded: true,
+                underline: const SizedBox(),
+                items: DeviceType.values.map((type) {
+                  return DropdownMenuItem(
+                    value: type,
+                    child: Row(
+                      children: [
+                        Icon(Device.iconFor(type), size: 20),
+                        const SizedBox(width: 8),
+                        Text(Device.typeLabel(type)),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() {
+                      _selectedType = value;
+                      // Reset location to default if current is not valid for new type
+                      final availableLocations = Device.availableLocationsFor(value);
+                      if (!availableLocations.contains(_selectedLocation)) {
+                        _selectedLocation = Device.defaultLocationFor(value);
+                      }
+                    });
+                  }
+                },
+              ),
             ),
+            const SizedBox(height: 12),
+            InputDecorator(
+              decoration: const InputDecoration(labelText: 'Body Location'),
+              child: DropdownButton<DeviceLocation>(
+                value: _selectedLocation,
+                isExpanded: true,
+                underline: const SizedBox(),
+                items: Device.availableLocationsFor(_selectedType).map((loc) {
+                  return DropdownMenuItem(
+                    value: loc,
+                    child: Text(Device.locationLabel(loc)),
+                  );
+                }).toList(),
+                onChanged: (value) {
+                  if (value != null) {
+                    setState(() => _selectedLocation = value);
+                  }
+                },
+              ),
+            ),
+            if (!isEdit) ...[
+              const SizedBox(height: 12),
+              InputDecorator(
+                decoration: const InputDecoration(labelText: 'Initial Status'),
+                child: DropdownButton<DeviceStatus>(
+                  value: _selectedStatus,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: DeviceStatus.values.map((status) {
+                    final label = switch (status) {
+                      DeviceStatus.worn => 'Worn (W)',
+                      DeviceStatus.loose => 'Loose (L)',
+                      DeviceStatus.charging => 'Charging (C)',
+                    };
+                    return DropdownMenuItem(
+                      value: status,
+                      child: Text(label),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedStatus = value);
+                    }
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _snController,
               decoration: const InputDecoration(labelText: 'Serial Number (optional)'),
+              inputFormatters: [FilteringTextInputFormatter.deny(RegExp(r'\s'))],
             ),
             const SizedBox(height: 16),
             const Divider(),
@@ -671,43 +706,6 @@ class _DeviceDialogState extends State<DeviceDialog> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         TextButton(onPressed: _submit, child: Text(isEdit ? 'Save' : 'Add')),
-      ],
-    );
-  }
-}
-
-class LocationPickerDialog extends StatelessWidget {
-  final DeviceLocation currentLocation;
-  final DeviceType deviceType;
-  const LocationPickerDialog({
-    super.key,
-    required this.currentLocation,
-    required this.deviceType,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final availableLocations = Device.availableLocationsFor(deviceType);
-    return AlertDialog(
-      title: const Text('Set Location'),
-      content: SizedBox(
-        width: double.maxFinite,
-        child: ListView.builder(
-          shrinkWrap: true,
-          itemCount: availableLocations.length,
-          itemBuilder: (ctx, i) {
-            final loc = availableLocations[i];
-            final isSelected = loc == currentLocation;
-            return ListTile(
-              title: Text(Device.locationLabel(loc)),
-              leading: isSelected ? const Icon(Icons.check, color: Colors.green) : null,
-              onTap: () => Navigator.pop(context, loc),
-            );
-          },
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       ],
     );
   }

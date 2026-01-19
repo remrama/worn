@@ -11,10 +11,14 @@ enum DeviceType {
   other,
 }
 
-enum DeviceLocation {
-  // Non-body locations (top of dropdown)
+/// Device status: worn (on body), loose (off body), or charging
+enum DeviceStatus {
+  worn,
   loose,
   charging,
+}
+
+enum DeviceLocation {
   // Wrist locations
   leftWrist,
   rightWrist,
@@ -50,6 +54,7 @@ class Device {
   final String id;
   final String name;
   final DeviceType deviceType;
+  final DeviceStatus status;
   final DeviceLocation location;
   final String? serialNumber;
   final bool isPoweredOn;
@@ -58,14 +63,17 @@ class Device {
     String? id,
     required this.name,
     this.deviceType = DeviceType.watch,
-    this.location = DeviceLocation.loose,
+    this.status = DeviceStatus.loose,
+    DeviceLocation? location,
     this.serialNumber,
     this.isPoweredOn = true,
-  }) : id = id ?? const Uuid().v4();
+  }) : id = id ?? const Uuid().v4(),
+       location = location ?? defaultLocationFor(deviceType);
 
   Device copyWith({
     String? name,
     DeviceType? deviceType,
+    DeviceStatus? status,
     DeviceLocation? location,
     String? serialNumber,
     bool? isPoweredOn,
@@ -74,6 +82,7 @@ class Device {
       id: id,
       name: name ?? this.name,
       deviceType: deviceType ?? this.deviceType,
+      status: status ?? this.status,
       location: location ?? this.location,
       serialNumber: serialNumber ?? this.serialNumber,
       isPoweredOn: isPoweredOn ?? this.isPoweredOn,
@@ -85,6 +94,7 @@ class Device {
       'id': id,
       'name': name,
       'deviceType': deviceType.name,
+      'status': status.name,
       'location': location.name,
       'serialNumber': serialNumber,
       'isPoweredOn': isPoweredOn,
@@ -92,11 +102,14 @@ class Device {
   }
 
   factory Device.fromMap(Map<String, dynamic> map) {
+    final deviceType = _parseDeviceType(map);
+    final parsed = _parseStatusAndLocation(map, deviceType);
     return Device(
       id: map['id'],
       name: map['name'],
-      deviceType: _parseDeviceType(map),
-      location: _parseLocation(map),
+      deviceType: deviceType,
+      status: parsed.$1,
+      location: parsed.$2,
       serialNumber: map['serialNumber'],
       isPoweredOn: map['isPoweredOn'] ?? true,
     );
@@ -110,27 +123,99 @@ class Device {
     return DeviceType.watch; // Default for migration
   }
 
-  /// Parse location from map, handling migration from old format
-  static DeviceLocation _parseLocation(Map<String, dynamic> map) {
-    // New format: single 'location' field
+  /// Parse status and location from map, handling migration from old format
+  static (DeviceStatus, DeviceLocation) _parseStatusAndLocation(
+    Map<String, dynamic> map,
+    DeviceType deviceType,
+  ) {
+    // Very old format: 'status' and 'placement' fields (no 'location' field)
+    if (map.containsKey('placement')) {
+      final oldStatus = map['status'] as String?;
+      final placement = map['placement'] as String?;
+      if (oldStatus == 'loose') {
+        return (DeviceStatus.loose, defaultLocationFor(deviceType));
+      }
+      if (oldStatus == 'charging') {
+        return (DeviceStatus.charging, defaultLocationFor(deviceType));
+      }
+      // If worn, use the placement as location
+      if (placement != null) {
+        return (DeviceStatus.worn, DeviceLocation.values.byName(placement));
+      }
+      return (DeviceStatus.loose, defaultLocationFor(deviceType));
+    }
+
+    // New format: separate 'status' and 'location' fields where location is a body part
+    if (map.containsKey('status') && map.containsKey('location')) {
+      final statusStr = map['status'] as String;
+      final locStr = map['location'] as String;
+      // Check if location is a body part (not 'loose' or 'charging')
+      if (locStr != 'loose' && locStr != 'charging') {
+        final status = DeviceStatus.values.byName(statusStr);
+        final location = DeviceLocation.values.byName(locStr);
+        return (status, location);
+      }
+    }
+
+    // Old format migration: 'location' field contained loose/charging/bodyPart
     if (map.containsKey('location')) {
-      return DeviceLocation.values.byName(map['location']);
+      final locStr = map['location'] as String;
+      if (locStr == 'loose') {
+        return (DeviceStatus.loose, defaultLocationFor(deviceType));
+      }
+      if (locStr == 'charging') {
+        return (DeviceStatus.charging, defaultLocationFor(deviceType));
+      }
+      // It's a body location, so status is worn
+      return (DeviceStatus.worn, DeviceLocation.values.byName(locStr));
     }
-    // Old format migration: combine 'status' and 'placement'
-    final status = map['status'] as String?;
-    final placement = map['placement'] as String?;
-    if (status == 'loose') return DeviceLocation.loose;
-    if (status == 'charging') return DeviceLocation.charging;
-    // If worn, use the placement as location
-    if (placement != null) {
-      return DeviceLocation.values.byName(placement);
-    }
-    return DeviceLocation.loose;
+
+    return (DeviceStatus.loose, defaultLocationFor(deviceType));
   }
 
   /// Whether the device is currently being worn (on a body part)
-  bool get isWorn =>
-      location != DeviceLocation.loose && location != DeviceLocation.charging;
+  bool get isWorn => status == DeviceStatus.worn;
+
+  /// Returns the default body location for a device type
+  static DeviceLocation defaultLocationFor(DeviceType type) {
+    switch (type) {
+      case DeviceType.watch:
+      case DeviceType.wristband:
+        return DeviceLocation.leftWrist;
+      case DeviceType.ring:
+        return DeviceLocation.leftRingFinger;
+      case DeviceType.armband:
+        return DeviceLocation.leftUpperArm;
+      case DeviceType.chestStrap:
+        return DeviceLocation.chest;
+      case DeviceType.headband:
+        return DeviceLocation.head;
+      case DeviceType.other:
+        return DeviceLocation.other;
+    }
+  }
+
+  static String statusLabel(DeviceStatus status) {
+    switch (status) {
+      case DeviceStatus.worn:
+        return 'Worn';
+      case DeviceStatus.loose:
+        return 'Loose';
+      case DeviceStatus.charging:
+        return 'Charging';
+    }
+  }
+
+  static String statusShortLabel(DeviceStatus status) {
+    switch (status) {
+      case DeviceStatus.worn:
+        return 'W';
+      case DeviceStatus.loose:
+        return 'L';
+      case DeviceStatus.charging:
+        return 'C';
+    }
+  }
 
   static IconData iconFor(DeviceType type) {
     switch (type) {
@@ -171,14 +256,12 @@ class Device {
   }
 
   static List<DeviceLocation> availableLocationsFor(DeviceType type) {
-    const common = [DeviceLocation.loose, DeviceLocation.charging];
     switch (type) {
       case DeviceType.watch:
       case DeviceType.wristband:
-        return [...common, DeviceLocation.leftWrist, DeviceLocation.rightWrist];
+        return [DeviceLocation.leftWrist, DeviceLocation.rightWrist];
       case DeviceType.ring:
         return [
-          ...common,
           DeviceLocation.leftIndexFinger,
           DeviceLocation.leftMiddleFinger,
           DeviceLocation.leftRingFinger,
@@ -192,14 +275,13 @@ class Device {
         ];
       case DeviceType.armband:
         return [
-          ...common,
           DeviceLocation.leftUpperArm,
           DeviceLocation.rightUpperArm,
         ];
       case DeviceType.chestStrap:
-        return [...common, DeviceLocation.chest];
+        return [DeviceLocation.chest];
       case DeviceType.headband:
-        return [...common, DeviceLocation.head];
+        return [DeviceLocation.head];
       case DeviceType.other:
         return DeviceLocation.values;
     }
@@ -207,10 +289,6 @@ class Device {
 
   static String locationLabel(DeviceLocation loc) {
     switch (loc) {
-      case DeviceLocation.loose:
-        return 'Loose';
-      case DeviceLocation.charging:
-        return 'Charging';
       case DeviceLocation.leftWrist:
         return 'Left Wrist';
       case DeviceLocation.rightWrist:

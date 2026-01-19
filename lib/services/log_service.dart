@@ -44,45 +44,44 @@ class LogService {
 
   Future<void> logDeviceAdded(Device device) async {
     final sn = device.serialNumber ?? 'none';
+    final power = device.isPoweredOn ? 'on' : 'off';
     await _append(
-      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\t${device.name}\t${device.deviceType.name}\t${device.location.name}\t$sn',
+      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\tname="${device.name}"\ttype=${device.deviceType.name}\tstatus=${device.status.name}\tlocation=${device.location.name}\tsn=$sn\tpower=$power',
     );
   }
 
-  Future<void> logDeviceEdited(Device oldDevice, Device newDevice) async {
+  Future<void> logDeviceUpdated(Device oldDevice, Device newDevice) async {
     final changes = <String>[];
+
     if (oldDevice.name != newDevice.name) {
-      changes.add('name:${newDevice.name}');
+      changes.add('name="${newDevice.name}"');
     }
     if (oldDevice.deviceType != newDevice.deviceType) {
-      changes.add('deviceType:${newDevice.deviceType.name}');
+      changes.add('type=${newDevice.deviceType.name}');
     }
     if (oldDevice.serialNumber != newDevice.serialNumber) {
-      changes.add('sn:${newDevice.serialNumber ?? "none"}');
+      changes.add('sn=${newDevice.serialNumber ?? 'none'}');
     }
-    if (changes.isNotEmpty) {
-      await _append(
-        '${_timestamp()}\tDEVICE_EDITED\t${newDevice.id}\t${changes.join(",")}',
-      );
+    if (oldDevice.status != newDevice.status) {
+      changes.add('status=${newDevice.status.name}');
     }
+    if (oldDevice.location != newDevice.location) {
+      changes.add('location=${newDevice.location.name}');
+    }
+    if (oldDevice.isPoweredOn != newDevice.isPoweredOn) {
+      changes.add('power=${newDevice.isPoweredOn ? 'on' : 'off'}');
+    }
+
+    if (changes.isEmpty) return;
+
+    await _append(
+      '${_timestamp()}\tDEVICE_UPDATED\t${newDevice.id}\t"${oldDevice.name}"\t${changes.join('\t')}',
+    );
   }
 
   Future<void> logDeviceDeleted(Device device) async {
     await _append(
-      '${_timestamp()}\tDEVICE_DELETED\t${device.id}\t${device.name}',
-    );
-  }
-
-  Future<void> logLocationChanged(Device device, DeviceLocation oldLocation, DeviceLocation newLocation) async {
-    await _append(
-      '${_timestamp()}\tLOCATION_CHANGED\t${device.id}\t${device.name}\t${newLocation.name}',
-    );
-  }
-
-  Future<void> logDevicePowerChanged(Device device, bool isPoweredOn) async {
-    final powerState = isPoweredOn ? 'on' : 'off';
-    await _append(
-      '${_timestamp()}\tPOWER_CHANGED\t${device.id}\t${device.name}\t$powerState',
+      '${_timestamp()}\tDEVICE_DELETED\t${device.id}\t"${device.name}"',
     );
   }
 
@@ -153,10 +152,10 @@ class LogService {
   }
 
   Future<void> logTrackingPaused() async {
-    await _append('${_timestamp()}\tTRACKING_PAUSED');
+    await _append('${_timestamp()}\tGLOBAL_TRACKING\toff');
   }
 
   Future<void> logTrackingResumed() async {
-    await _append('${_timestamp()}\tTRACKING_RESUMED');
+    await _append('${_timestamp()}\tGLOBAL_TRACKING\ton');
   }
 }
