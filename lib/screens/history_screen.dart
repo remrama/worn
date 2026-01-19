@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:share_plus/share_plus.dart';
 import '../services/log_service.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -37,12 +38,33 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
   }
 
+  Future<void> _shareLog() async {
+    try {
+      final content = await LogService.instance.getLogContent();
+      await Share.share(
+        content,
+        subject: 'Worn Log Export',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to share log: $e')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('History'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.share),
+            tooltip: 'Share log',
+            onPressed: _shareLog,
+          ),
           IconButton(
             icon: const Icon(Icons.copy),
             tooltip: 'Copy log to clipboard',
