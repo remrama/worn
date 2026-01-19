@@ -525,6 +525,7 @@ class _DeviceDialogState extends State<DeviceDialog> {
   final _snController = TextEditingController();
   late DeviceType _selectedType;
   late DeviceLocation _selectedLocation;
+  late DeviceStatus _selectedStatus;
   late bool _isPoweredOn;
 
   @override
@@ -535,10 +536,12 @@ class _DeviceDialogState extends State<DeviceDialog> {
       _snController.text = widget.device!.serialNumber ?? '';
       _selectedType = widget.device!.deviceType;
       _selectedLocation = widget.device!.location;
+      _selectedStatus = widget.device!.status;
       _isPoweredOn = widget.device!.isPoweredOn;
     } else {
       _selectedType = DeviceType.watch;
       _selectedLocation = Device.defaultLocationFor(DeviceType.watch);
+      _selectedStatus = DeviceStatus.loose;
       _isPoweredOn = true;
     }
   }
@@ -559,7 +562,7 @@ class _DeviceDialogState extends State<DeviceDialog> {
       id: widget.device?.id,
       name: name,
       deviceType: _selectedType,
-      status: widget.device?.status ?? DeviceStatus.loose,
+      status: widget.device?.status ?? _selectedStatus,
       location: _selectedLocation,
       serialNumber: sn.isEmpty ? null : sn,
       isPoweredOn: _isPoweredOn,
@@ -657,6 +660,33 @@ class _DeviceDialogState extends State<DeviceDialog> {
                       },
               ),
             ),
+            if (!isEdit) ...[
+              const SizedBox(height: 12),
+              InputDecorator(
+                decoration: const InputDecoration(labelText: 'Initial Status'),
+                child: DropdownButton<DeviceStatus>(
+                  value: _selectedStatus,
+                  isExpanded: true,
+                  underline: const SizedBox(),
+                  items: DeviceStatus.values.map((status) {
+                    final label = switch (status) {
+                      DeviceStatus.worn => 'Worn (W)',
+                      DeviceStatus.loose => 'Loose (L)',
+                      DeviceStatus.charging => 'Charging (C)',
+                    };
+                    return DropdownMenuItem(
+                      value: status,
+                      child: Text(label),
+                    );
+                  }).toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _selectedStatus = value);
+                    }
+                  },
+                ),
+              ),
+            ],
             const SizedBox(height: 12),
             TextField(
               controller: _snController,
