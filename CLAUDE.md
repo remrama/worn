@@ -52,7 +52,8 @@ lib/
 ├── services/
 │   ├── device_store.dart  # Device persistence (singleton)
 │   ├── event_store.dart   # Active event persistence (singleton)
-│   └── log_service.dart   # Event logging (singleton)
+│   ├── log_service.dart   # Event logging (singleton)
+│   └── tracking_service.dart  # Tracking state persistence (singleton)
 └── widgets/               # Custom reusable widgets
 ```
 
@@ -62,10 +63,11 @@ Uses `SharedPreferences` with these keys:
 - `worn_devices`: JSON-encoded list of device maps
 - `worn_events`: JSON-encoded list of active event maps
 - `worn_log`: Newline-separated tab-delimited log entries
+- `worn_tracking`: Boolean tracking state (true = tracking, false = paused)
 
 ## Key Patterns
 
-- **Singletons**: Access services via `DeviceStore.instance`, `EventStore.instance`, and `LogService.instance`
+- **Singletons**: Access services via `DeviceStore.instance`, `EventStore.instance`, `LogService.instance`, and `TrackingService.instance`
 - **Immutability**: Device and Event models use copyWith for updates
 - **Enums**: `DeviceLocation` (loose/charging/leftWrist/rightWrist/etc.), `EventType` (watchTv/inBed/lightsOut/walk/run/workout/swim/other)
 - **Time Windows**: Events support earliest/latest timestamps for retroactive logging uncertainty
@@ -80,6 +82,8 @@ Tab-separated entries with UTC ISO 8601 timestamps. Time windows use `..` separa
 2024-01-15T11:00:00.000Z	EVENT_STARTED	uuid	walk	Walk	2024-01-15T11:00:00.000Z
 2024-01-15T11:30:00.000Z	EVENT_STOPPED	uuid	walk	Walk	2024-01-15T11:00:00.000Z	2024-01-15T11:25:00.000Z..2024-01-15T11:30:00.000Z
 2024-01-15T12:00:00.000Z	NOTE	User added a custom note
+2024-01-15T18:00:00.000Z	TRACKING_PAUSED
+2024-01-17T09:00:00.000Z	TRACKING_RESUMED
 ```
 
 ## Testing

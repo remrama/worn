@@ -5,6 +5,7 @@ import '../models/event.dart';
 import '../services/device_store.dart';
 import '../services/event_store.dart';
 import '../services/log_service.dart';
+import '../services/tracking_service.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
@@ -17,6 +18,7 @@ class _LogsScreenState extends State<LogsScreen> {
   List<Device> _devices = [];
   List<Event> _events = [];
   bool _loading = true;
+  bool _isTracking = true;
   Timer? _durationTimer;
 
   @override
@@ -37,10 +39,25 @@ class _LogsScreenState extends State<LogsScreen> {
   Future<void> _load() async {
     final devices = await DeviceStore.instance.getDevices();
     final events = await EventStore.instance.getActiveEvents();
+    final isTracking = await TrackingService.instance.isTracking();
     setState(() {
       _devices = devices;
       _events = events;
+      _isTracking = isTracking;
       _loading = false;
+    });
+  }
+
+  Future<void> _toggleTracking() async {
+    final newValue = !_isTracking;
+    await TrackingService.instance.setTracking(newValue);
+    if (newValue) {
+      await LogService.instance.logTrackingResumed();
+    } else {
+      await LogService.instance.logTrackingPaused();
+    }
+    setState(() {
+      _isTracking = newValue;
     });
   }
 
@@ -288,7 +305,30 @@ class _LogsScreenState extends State<LogsScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Logs')),
+      appBar: AppBar(
+        title: const Text('Logs'),
+        backgroundColor: _isTracking ? null : Colors.orange.shade100,
+        actions: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _isTracking ? 'Tracking' : 'Paused',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _isTracking ? Colors.green : Colors.orange.shade800,
+                ),
+              ),
+              Switch(
+                value: _isTracking,
+                onChanged: (_) => _toggleTracking(),
+                activeThumbColor: Colors.green,
+                inactiveThumbColor: Colors.orange,
+              ),
+            ],
+          ),
+        ],
+      ),
       body: ListView(
         children: [
           // Devices section
