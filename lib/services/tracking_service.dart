@@ -13,6 +13,14 @@ class TrackingService {
     return _instance!;
   }
 
+  /// Reset singleton instance for test isolation.
+  ///
+  /// This mirrors the pattern used in LogService so tests can start
+  /// from a clean state between runs.
+  static void resetForTesting() {
+    _instance = null;
+  }
+
   Future<void> _ensureLoaded() async {
     if (_prefs != null) return;
     _prefs = await SharedPreferences.getInstance();
