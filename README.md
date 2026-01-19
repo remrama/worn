@@ -43,6 +43,18 @@ flutter test
 flutter run
 ```
 
+### Web Support
+
+This app now supports Flutter web! To build and run the web version:
+
+```bash
+flutter build web --release
+# Or run in development
+flutter run -d chrome
+```
+
+For maintainers: See [SETUP_VERCEL.md](SETUP_VERCEL.md) for instructions on configuring automatic web preview deployments for pull requests.
+
 ## Structure
 
 ```
