@@ -24,9 +24,19 @@ flutter analyze
 # Format code
 dart format lib test
 
-# Generate app icons
+# Generate app icons (only needed when updating assets/icon/icon.png)
+# Generated icons are committed to the repo and used by builds automatically
 dart run flutter_launcher_icons
 ```
+
+## CI/CD Workflows
+
+- **test.yml**: Runs tests and analyze on all pushes to main and PRs (fast gate)
+- **build-android.yml**: Development APK builds on pushes to main
+- **deploy-web-preview.yml**: Web preview deployments for all PRs to main
+- **release.yml**: Production release pipeline triggered by version tags (v*.*.*)
+
+**Note:** Icon generation (`dart run flutter_launcher_icons`) is NOT required in CI workflows. The generated icon files are already committed to the repository and used automatically during builds. Only run this command locally when updating the source icon image.
 
 ## Architecture
 

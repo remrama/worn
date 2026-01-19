@@ -1,10 +1,11 @@
-name: Build Android APK
+name: Build Android APK (Development)
+
+# This workflow builds development APKs for testing from main branch between releases.
+# For production releases, use the release.yml workflow with version tags.
 
 on:
   push:
-    branches: [main, dev]
-  pull_request:
-    branches: [main, dev]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -28,9 +29,6 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
-
-      - name: Run tests
-        run: flutter test
 
       - name: Build APK
         run: flutter build apk --release --build-number=${{ github.run_number }}

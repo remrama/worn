@@ -3,11 +3,12 @@ name: Deploy Web Preview
 on:
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened]
 
 jobs:
   deploy-preview:
     runs-on: ubuntu-latest
-    
+
     permissions:
       contents: read
       pull-requests: write
@@ -23,9 +24,6 @@ jobs:
 
       - name: Get dependencies
         run: flutter pub get
-
-      - name: Run tests
-        run: flutter test
 
       - name: Build web
         run: flutter build web --release --base-href=/
