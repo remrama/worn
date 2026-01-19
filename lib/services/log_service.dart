@@ -139,4 +139,12 @@ class LogService {
     await _ensureLoaded();
     return _logLines.join('\n');
   }
+
+  Future<void> logTrackingPaused() async {
+    await _append('${_timestamp()}\tTRACKING_PAUSED');
+  }
+
+  Future<void> logTrackingResumed() async {
+    await _append('${_timestamp()}\tTRACKING_RESUMED');
+  }
 }

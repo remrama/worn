@@ -6,6 +6,7 @@ import '../services/device_store.dart';
 import '../services/event_store.dart';
 import '../services/log_service.dart';
 import '../services/notification_service.dart';
+import '../services/tracking_service.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
@@ -15,9 +16,13 @@ class LogsScreen extends StatefulWidget {
 }
 
 class _LogsScreenState extends State<LogsScreen> {
+  static const String _trackingPausedMessage = 
+      'Logging is currently paused. Enable tracking to add devices, events, or notes.';
+  
   List<Device> _devices = [];
   List<Event> _events = [];
   bool _loading = true;
+  bool _isTracking = true;
   Timer? _durationTimer;
 
   @override
@@ -38,17 +43,36 @@ class _LogsScreenState extends State<LogsScreen> {
   Future<void> _load() async {
     final devices = await DeviceStore.instance.getDevices();
     final events = await EventStore.instance.getActiveEvents();
+    final isTracking = await TrackingService.instance.isTracking();
     setState(() {
       _devices = devices;
       _events = events;
+      _isTracking = isTracking;
       _loading = false;
     });
     // Update notification to reflect current events with freshly calculated durations
     await NotificationService.instance.updateNotification(events);
   }
 
+  Future<void> _toggleTracking() async {
+    final newValue = !_isTracking;
+    await TrackingService.instance.setTracking(newValue);
+    if (newValue) {
+      await LogService.instance.logTrackingResumed();
+    } else {
+      await LogService.instance.logTrackingPaused();
+    }
+    setState(() {
+      _isTracking = newValue;
+    });
+  }
+
   // Device methods
   Future<void> _addDevice() async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
     final result = await showDialog<Device>(
       context: context,
       builder: (ctx) => const DeviceDialog(),
@@ -69,6 +93,10 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _editDevice(Device device) async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
     final result = await showDialog<Device>(
       context: context,
       builder: (ctx) => DeviceDialog(device: device),
@@ -103,7 +131,26 @@ class _LogsScreenState extends State<LogsScreen> {
     }
   }
 
+  Future<void> _showTrackingPausedWarning() async {
+    if (mounted) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Tracking Paused'),
+          content: const Text(_trackingPausedMessage),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
+    }
+  }
+
   Future<void> _deleteDevice(Device device) async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -123,6 +170,10 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _changeLocation(Device device) async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
     final newLocation = await showDialog<DeviceLocation>(
       context: context,
       builder: (ctx) => LocationPickerDialog(currentLocation: device.location),
@@ -137,6 +188,10 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _addDeviceNote(Device device) async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
     final note = await showDialog<String>(
       context: context,
       builder: (ctx) => NoteDialog(deviceName: device.name),
@@ -148,6 +203,10 @@ class _LogsScreenState extends State<LogsScreen> {
 
   // Event methods
   Future<void> _addEvent() async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
     final result = await showDialog<AddEventResult>(
       context: context,
       builder: (ctx) => const AddEventDialog(),
@@ -168,6 +227,10 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _stopEvent(Event event) async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
     final result = await showDialog<StopEventResult>(
       context: context,
       builder: (ctx) => StopEventDialog(event: event),
@@ -184,6 +247,10 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _cancelEvent(Event event) async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -204,6 +271,10 @@ class _LogsScreenState extends State<LogsScreen> {
 
   // Note method
   Future<void> _addNote() async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
     final note = await showDialog<String>(
       context: context,
       builder: (ctx) => const NoteDialog(),
@@ -291,7 +362,30 @@ class _LogsScreenState extends State<LogsScreen> {
     }
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Logs')),
+      appBar: AppBar(
+        title: const Text('Logs'),
+        backgroundColor: _isTracking ? null : Colors.orange.shade100,
+        actions: [
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                _isTracking ? 'Tracking' : 'Paused',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: _isTracking ? Colors.green : Colors.orange.shade800,
+                ),
+              ),
+              Switch(
+                value: _isTracking,
+                onChanged: (_) => _toggleTracking(),
+                activeThumbColor: Colors.green,
+                inactiveThumbColor: Colors.orange,
+              ),
+            ],
+          ),
+        ],
+      ),
       body: ListView(
         children: [
           // Devices section
