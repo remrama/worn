@@ -16,6 +16,7 @@ A minimal Flutter app for logging wearable device status and event detection.
   - Tap chip to set device location (loose, charging, or body part)
   - Start/stop/cancel events with time window estimates for retroactive logging
   - Add timestamped notes (general or device-specific)
+  - **Persistent notification**: Silent notification shows active events and their durations to remind you to stop them
 - **History tab**: View raw log, copy to clipboard for parsing
 
 ## Event Types
@@ -69,5 +70,6 @@ lib/
 └── services/
     ├── device_store.dart
     ├── event_store.dart
-    └── log_service.dart
+    ├── log_service.dart
+    └── notification_service.dart
 ```

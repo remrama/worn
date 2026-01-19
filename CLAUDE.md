@@ -52,7 +52,8 @@ lib/
 ├── services/
 │   ├── device_store.dart  # Device persistence (singleton)
 │   ├── event_store.dart   # Active event persistence (singleton)
-│   └── log_service.dart   # Event logging (singleton)
+│   ├── log_service.dart   # Event logging (singleton)
+│   └── notification_service.dart  # Persistent notification for active events (singleton)
 └── widgets/               # Custom reusable widgets
 ```
 
@@ -65,11 +66,12 @@ Uses `SharedPreferences` with these keys:
 
 ## Key Patterns
 
-- **Singletons**: Access services via `DeviceStore.instance`, `EventStore.instance`, and `LogService.instance`
+- **Singletons**: Access services via `DeviceStore.instance`, `EventStore.instance`, `LogService.instance`, and `NotificationService.instance`
 - **Immutability**: Device and Event models use copyWith for updates
 - **Enums**: `DeviceLocation` (loose/charging/leftWrist/rightWrist/etc.), `EventType` (watchTv/inBed/lightsOut/walk/run/workout/swim/other)
 - **Time Windows**: Events support earliest/latest timestamps for retroactive logging uncertainty
 - **Validation**: DeviceStore throws exceptions for duplicate device names
+- **Persistent Notifications**: Silent, ongoing notifications display active events and durations (auto-updated when events start/stop)
 
 ## Log Format
 
