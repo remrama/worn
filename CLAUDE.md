@@ -24,7 +24,9 @@ Minimalist, borderline brutalist. The tiny, technical audience means UI prioriti
 ### Core Functionality
 
 - Add/manage wearable devices (watches, rings, bands, etc.)
-- Track device location (loose, charging, or body placement) and power state
+- Track device status (worn, loose, charging) with quick 3-way toggle on device list
+- Track device body location (set in device edit menu, only relevant when worn)
+- Track device power state (on/off)
 - Start/stop events with optional time windows for retroactive logging
 - Export tab-separated logs for external analysis
 - Persistent notifications to prevent forgetting active events
@@ -67,8 +69,9 @@ dart run flutter_launcher_icons
 
 - **Models** (`lib/models/`): Immutable data classes with copyWith, toMap/fromMap
   - Device model includes DeviceType enum (watch, ring, wristband, armband, chestStrap, headband, other)
+  - Device model includes DeviceStatus enum (worn, loose, charging) for quick status toggle
+  - Device model includes DeviceLocation enum for body placement (filtered by device type)
   - Device model includes isPoweredOn boolean (defaults to true for backward compatibility)
-  - Available locations filtered by device type
 - **Services** (`lib/services/`): Singleton instances for business logic and persistence
 - **Screens** (`lib/screens/`): Stateful widgets using setState for state management
 
@@ -80,7 +83,7 @@ dart run flutter_launcher_icons
 lib/
 ├── main.dart              # App entry point & 2-tab navigation (Logs, History)
 ├── models/
-│   ├── device.dart        # Device model with DeviceType & DeviceLocation enums
+│   ├── device.dart        # Device model with DeviceType, DeviceStatus & DeviceLocation enums
 │   └── event.dart         # Event model with EventType enum and time windows
 ├── screens/
 │   ├── logs_screen.dart   # Unified device & event management UI with type icons
@@ -108,7 +111,8 @@ Uses `SharedPreferences` with these keys:
 - **Immutability**: Device and Event models use copyWith for updates
 - **Enums**:
   - `DeviceType` (watch, ring, wristband, armband, chestStrap, headband, other) with icons
-  - `DeviceLocation` (loose, charging, plus body-specific locations filtered by device type)
+  - `DeviceStatus` (worn, loose, charging) for quick status toggle
+  - `DeviceLocation` (body-specific locations filtered by device type)
   - `EventType` (watchTv/inBed/lightsOut/walk/run/workout/swim/other)
 - **Time Windows**: Events support earliest/latest timestamps for retroactive logging uncertainty
 - **Validation**: DeviceStore throws exceptions for duplicate device names
@@ -121,8 +125,9 @@ Uses `SharedPreferences` with these keys:
 
 Tab-separated entries with UTC ISO 8601 timestamps. Time windows use `..` separator. Uses internal variable names for parsing efficiency:
 ```
-2024-01-15T10:30:00.000Z	DEVICE_ADDED	uuid	MyWatch	watch	loose	SN123
-2024-01-15T10:35:00.000Z	LOCATION_CHANGED	uuid	MyWatch	leftWrist
+2024-01-15T10:30:00.000Z	DEVICE_ADDED	uuid	MyWatch	watch	loose	leftWrist	SN123
+2024-01-15T10:35:00.000Z	STATUS_CHANGED	uuid	MyWatch	worn
+2024-01-15T10:36:00.000Z	LOCATION_CHANGED	uuid	MyWatch	rightWrist
 2024-01-15T10:40:00.000Z	POWER_CHANGED	uuid	MyWatch	off
 2024-01-15T11:00:00.000Z	EVENT_STARTED	uuid	walk	2024-01-15T11:00:00.000Z
 2024-01-15T11:30:00.000Z	EVENT_STOPPED	uuid	walk	2024-01-15T11:00:00.000Z	2024-01-15T11:25:00.000Z..2024-01-15T11:30:00.000Z

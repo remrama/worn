@@ -45,7 +45,7 @@ class LogService {
   Future<void> logDeviceAdded(Device device) async {
     final sn = device.serialNumber ?? 'none';
     await _append(
-      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\t${device.name}\t${device.deviceType.name}\t${device.location.name}\t$sn',
+      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\t${device.name}\t${device.deviceType.name}\t${device.status.name}\t${device.location.name}\t$sn',
     );
   }
 
@@ -73,7 +73,13 @@ class LogService {
     );
   }
 
-  Future<void> logLocationChanged(Device device, DeviceLocation oldLocation, DeviceLocation newLocation) async {
+  Future<void> logStatusChanged(Device device, DeviceStatus newStatus) async {
+    await _append(
+      '${_timestamp()}\tSTATUS_CHANGED\t${device.id}\t${device.name}\t${newStatus.name}',
+    );
+  }
+
+  Future<void> logLocationChanged(Device device, DeviceLocation newLocation) async {
     await _append(
       '${_timestamp()}\tLOCATION_CHANGED\t${device.id}\t${device.name}\t${newLocation.name}',
     );

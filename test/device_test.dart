@@ -4,11 +4,12 @@ import 'package:worn/models/device.dart';
 
 void main() {
   group('Device model', () {
-    test('creates with required fields and defaults to loose', () {
+    test('creates with required fields and defaults to loose status', () {
       final device = Device(name: 'Test Device');
 
       expect(device.name, 'Test Device');
-      expect(device.location, DeviceLocation.loose);
+      expect(device.status, DeviceStatus.loose);
+      expect(device.location, DeviceLocation.leftWrist); // Default for watch
       expect(device.serialNumber, isNull);
       expect(device.id, isNotEmpty);
       expect(device.isPoweredOn, true);
@@ -17,12 +18,14 @@ void main() {
     test('creates with all fields', () {
       final device = Device(
         name: 'Full Device',
+        status: DeviceStatus.worn,
         location: DeviceLocation.rightWrist,
         serialNumber: 'SN123',
         isPoweredOn: false,
       );
 
       expect(device.name, 'Full Device');
+      expect(device.status, DeviceStatus.worn);
       expect(device.location, DeviceLocation.rightWrist);
       expect(device.serialNumber, 'SN123');
       expect(device.isPoweredOn, false);
@@ -31,16 +34,18 @@ void main() {
     test('copyWith preserves unchanged fields', () {
       final device = Device(
         name: 'Original',
+        status: DeviceStatus.worn,
         location: DeviceLocation.leftWrist,
         serialNumber: 'SN123',
         isPoweredOn: false,
       );
 
-      final updated = device.copyWith(location: DeviceLocation.charging);
+      final updated = device.copyWith(status: DeviceStatus.charging);
 
       expect(updated.id, device.id);
       expect(updated.name, 'Original');
-      expect(updated.location, DeviceLocation.charging);
+      expect(updated.status, DeviceStatus.charging);
+      expect(updated.location, DeviceLocation.leftWrist);
       expect(updated.serialNumber, 'SN123');
       expect(updated.isPoweredOn, false);
     });
@@ -57,9 +62,11 @@ void main() {
     test('toMap and fromMap roundtrip', () {
       final device = Device(
         name: 'Roundtrip',
+        status: DeviceStatus.worn,
         location: DeviceLocation.leftIndexFinger,
         serialNumber: 'ABC',
         isPoweredOn: false,
+        deviceType: DeviceType.ring,
       );
 
       final map = device.toMap();
@@ -67,14 +74,52 @@ void main() {
 
       expect(restored.id, device.id);
       expect(restored.name, device.name);
+      expect(restored.status, device.status);
       expect(restored.location, device.location);
       expect(restored.serialNumber, device.serialNumber);
       expect(restored.deviceType, device.deviceType);
       expect(restored.isPoweredOn, device.isPoweredOn);
     });
 
-    test('fromMap handles old format migration', () {
-      // Old format: loose status
+    test('fromMap handles old format migration (location field with loose/charging)', () {
+      // Old format: location was 'loose'
+      final looseMap = {
+        'id': 'test-id-1',
+        'name': 'Old Device',
+        'deviceType': 'watch',
+        'location': 'loose',
+        'serialNumber': null,
+      };
+      final looseDevice = Device.fromMap(looseMap);
+      expect(looseDevice.status, DeviceStatus.loose);
+      expect(looseDevice.location, DeviceLocation.leftWrist); // default for watch
+
+      // Old format: location was 'charging'
+      final chargingMap = {
+        'id': 'test-id-2',
+        'name': 'Charging Device',
+        'deviceType': 'watch',
+        'location': 'charging',
+        'serialNumber': null,
+      };
+      final chargingDevice = Device.fromMap(chargingMap);
+      expect(chargingDevice.status, DeviceStatus.charging);
+
+      // Old format: location was body part (means worn)
+      final wornMap = {
+        'id': 'test-id-3',
+        'name': 'Worn Device',
+        'deviceType': 'watch',
+        'location': 'leftWrist',
+        'serialNumber': 'SN456',
+      };
+      final wornDevice = Device.fromMap(wornMap);
+      expect(wornDevice.status, DeviceStatus.worn);
+      expect(wornDevice.location, DeviceLocation.leftWrist);
+    });
+
+    test('fromMap handles very old format migration (status + placement fields)', () {
+      // Very old format: separate status and placement
       final looseMap = {
         'id': 'test-id-1',
         'name': 'Old Device',
@@ -83,9 +128,9 @@ void main() {
         'status': 'loose',
       };
       final looseDevice = Device.fromMap(looseMap);
-      expect(looseDevice.location, DeviceLocation.loose);
+      expect(looseDevice.status, DeviceStatus.loose);
 
-      // Old format: charging status
+      // Very old format: charging status
       final chargingMap = {
         'id': 'test-id-2',
         'name': 'Charging Device',
@@ -94,9 +139,9 @@ void main() {
         'status': 'charging',
       };
       final chargingDevice = Device.fromMap(chargingMap);
-      expect(chargingDevice.location, DeviceLocation.charging);
+      expect(chargingDevice.status, DeviceStatus.charging);
 
-      // Old format: worn status (uses placement)
+      // Very old format: worn status (uses placement)
       final wornMap = {
         'id': 'test-id-3',
         'name': 'Worn Device',
@@ -105,6 +150,7 @@ void main() {
         'status': 'worn',
       };
       final wornDevice = Device.fromMap(wornMap);
+      expect(wornDevice.status, DeviceStatus.worn);
       expect(wornDevice.location, DeviceLocation.leftAnkle);
     });
 
@@ -113,6 +159,7 @@ void main() {
         'id': 'test-id',
         'name': 'Old Device',
         'deviceType': 'watch',
+        'status': 'loose',
         'location': 'leftWrist',
         'serialNumber': null,
         // No isPoweredOn field
@@ -121,16 +168,25 @@ void main() {
       expect(device.isPoweredOn, true);
     });
 
-    test('isWorn returns correct value', () {
-      expect(Device(name: 'D1', location: DeviceLocation.loose).isWorn, false);
-      expect(Device(name: 'D2', location: DeviceLocation.charging).isWorn, false);
-      expect(Device(name: 'D3', location: DeviceLocation.leftWrist).isWorn, true);
-      expect(Device(name: 'D4', location: DeviceLocation.chest).isWorn, true);
+    test('isWorn returns correct value based on status', () {
+      expect(Device(name: 'D1', status: DeviceStatus.loose).isWorn, false);
+      expect(Device(name: 'D2', status: DeviceStatus.charging).isWorn, false);
+      expect(Device(name: 'D3', status: DeviceStatus.worn).isWorn, true);
+    });
+
+    test('status labels are readable', () {
+      expect(Device.statusLabel(DeviceStatus.worn), 'Worn');
+      expect(Device.statusLabel(DeviceStatus.loose), 'Loose');
+      expect(Device.statusLabel(DeviceStatus.charging), 'Charging');
+    });
+
+    test('status short labels are single letters', () {
+      expect(Device.statusShortLabel(DeviceStatus.worn), 'W');
+      expect(Device.statusShortLabel(DeviceStatus.loose), 'L');
+      expect(Device.statusShortLabel(DeviceStatus.charging), 'C');
     });
 
     test('location labels are readable', () {
-      expect(Device.locationLabel(DeviceLocation.loose), 'Loose');
-      expect(Device.locationLabel(DeviceLocation.charging), 'Charging');
       expect(Device.locationLabel(DeviceLocation.leftWrist), 'Left Wrist');
       expect(Device.locationLabel(DeviceLocation.rightAnkle), 'Right Ankle');
       expect(Device.locationLabel(DeviceLocation.leftIndexFinger), 'Left Index Finger');
@@ -157,28 +213,32 @@ void main() {
       expect(Device.typeLabel(DeviceType.other), 'Other');
     });
 
-    test('availableLocationsFor watch includes wrist locations', () {
+    test('defaultLocationFor returns sensible defaults', () {
+      expect(Device.defaultLocationFor(DeviceType.watch), DeviceLocation.leftWrist);
+      expect(Device.defaultLocationFor(DeviceType.wristband), DeviceLocation.leftWrist);
+      expect(Device.defaultLocationFor(DeviceType.ring), DeviceLocation.leftRingFinger);
+      expect(Device.defaultLocationFor(DeviceType.armband), DeviceLocation.leftUpperArm);
+      expect(Device.defaultLocationFor(DeviceType.chestStrap), DeviceLocation.chest);
+      expect(Device.defaultLocationFor(DeviceType.headband), DeviceLocation.head);
+      expect(Device.defaultLocationFor(DeviceType.other), DeviceLocation.other);
+    });
+
+    test('availableLocationsFor watch includes wrist locations only', () {
       final locations = Device.availableLocationsFor(DeviceType.watch);
-      expect(locations, contains(DeviceLocation.loose));
-      expect(locations, contains(DeviceLocation.charging));
       expect(locations, contains(DeviceLocation.leftWrist));
       expect(locations, contains(DeviceLocation.rightWrist));
-      expect(locations.length, 4);
+      expect(locations.length, 2);
     });
 
-    test('availableLocationsFor wristband includes wrist locations', () {
+    test('availableLocationsFor wristband includes wrist locations only', () {
       final locations = Device.availableLocationsFor(DeviceType.wristband);
-      expect(locations, contains(DeviceLocation.loose));
-      expect(locations, contains(DeviceLocation.charging));
       expect(locations, contains(DeviceLocation.leftWrist));
       expect(locations, contains(DeviceLocation.rightWrist));
-      expect(locations.length, 4);
+      expect(locations.length, 2);
     });
 
-    test('availableLocationsFor ring includes finger locations', () {
+    test('availableLocationsFor ring includes finger locations only', () {
       final locations = Device.availableLocationsFor(DeviceType.ring);
-      expect(locations, contains(DeviceLocation.loose));
-      expect(locations, contains(DeviceLocation.charging));
       expect(locations, contains(DeviceLocation.leftIndexFinger));
       expect(locations, contains(DeviceLocation.leftMiddleFinger));
       expect(locations, contains(DeviceLocation.leftRingFinger));
@@ -189,32 +249,26 @@ void main() {
       expect(locations, contains(DeviceLocation.rightRingFinger));
       expect(locations, contains(DeviceLocation.rightPinkyFinger));
       expect(locations, contains(DeviceLocation.rightThumb));
-      expect(locations.length, 12);
+      expect(locations.length, 10);
     });
 
-    test('availableLocationsFor armband includes upper arm locations', () {
+    test('availableLocationsFor armband includes upper arm locations only', () {
       final locations = Device.availableLocationsFor(DeviceType.armband);
-      expect(locations, contains(DeviceLocation.loose));
-      expect(locations, contains(DeviceLocation.charging));
       expect(locations, contains(DeviceLocation.leftUpperArm));
       expect(locations, contains(DeviceLocation.rightUpperArm));
-      expect(locations.length, 4);
+      expect(locations.length, 2);
     });
 
-    test('availableLocationsFor chestStrap includes chest location', () {
+    test('availableLocationsFor chestStrap includes chest location only', () {
       final locations = Device.availableLocationsFor(DeviceType.chestStrap);
-      expect(locations, contains(DeviceLocation.loose));
-      expect(locations, contains(DeviceLocation.charging));
       expect(locations, contains(DeviceLocation.chest));
-      expect(locations.length, 3);
+      expect(locations.length, 1);
     });
 
-    test('availableLocationsFor headband includes head location', () {
+    test('availableLocationsFor headband includes head location only', () {
       final locations = Device.availableLocationsFor(DeviceType.headband);
-      expect(locations, contains(DeviceLocation.loose));
-      expect(locations, contains(DeviceLocation.charging));
       expect(locations, contains(DeviceLocation.head));
-      expect(locations.length, 3);
+      expect(locations.length, 1);
     });
 
     test('availableLocationsFor other includes all locations', () {
