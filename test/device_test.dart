@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:worn/models/device.dart';
 
@@ -105,6 +106,91 @@ void main() {
       expect(Device.locationLabel(DeviceLocation.rightAnkle), 'Right Ankle');
       expect(Device.locationLabel(DeviceLocation.leftIndexFinger), 'Left Index Finger');
       expect(Device.locationLabel(DeviceLocation.chest), 'Chest');
+    });
+
+    test('iconFor returns correct icons for each device type', () {
+      expect(Device.iconFor(DeviceType.watch), Icons.watch);
+      expect(Device.iconFor(DeviceType.ring), Icons.circle_outlined);
+      expect(Device.iconFor(DeviceType.wristband), Icons.watch_outlined);
+      expect(Device.iconFor(DeviceType.armband), Icons.sports);
+      expect(Device.iconFor(DeviceType.chestStrap), Icons.favorite);
+      expect(Device.iconFor(DeviceType.headband), Icons.headset);
+      expect(Device.iconFor(DeviceType.other), Icons.devices_other);
+    });
+
+    test('typeLabel returns correct labels for each device type', () {
+      expect(Device.typeLabel(DeviceType.watch), 'Watch');
+      expect(Device.typeLabel(DeviceType.ring), 'Ring');
+      expect(Device.typeLabel(DeviceType.wristband), 'Wristband');
+      expect(Device.typeLabel(DeviceType.armband), 'Armband');
+      expect(Device.typeLabel(DeviceType.chestStrap), 'Chest Strap');
+      expect(Device.typeLabel(DeviceType.headband), 'Headband');
+      expect(Device.typeLabel(DeviceType.other), 'Other');
+    });
+
+    test('availableLocationsFor watch includes wrist locations', () {
+      final locations = Device.availableLocationsFor(DeviceType.watch);
+      expect(locations, contains(DeviceLocation.loose));
+      expect(locations, contains(DeviceLocation.charging));
+      expect(locations, contains(DeviceLocation.leftWrist));
+      expect(locations, contains(DeviceLocation.rightWrist));
+      expect(locations.length, 4);
+    });
+
+    test('availableLocationsFor wristband includes wrist locations', () {
+      final locations = Device.availableLocationsFor(DeviceType.wristband);
+      expect(locations, contains(DeviceLocation.loose));
+      expect(locations, contains(DeviceLocation.charging));
+      expect(locations, contains(DeviceLocation.leftWrist));
+      expect(locations, contains(DeviceLocation.rightWrist));
+      expect(locations.length, 4);
+    });
+
+    test('availableLocationsFor ring includes finger locations', () {
+      final locations = Device.availableLocationsFor(DeviceType.ring);
+      expect(locations, contains(DeviceLocation.loose));
+      expect(locations, contains(DeviceLocation.charging));
+      expect(locations, contains(DeviceLocation.leftIndexFinger));
+      expect(locations, contains(DeviceLocation.leftMiddleFinger));
+      expect(locations, contains(DeviceLocation.leftRingFinger));
+      expect(locations, contains(DeviceLocation.leftPinkyFinger));
+      expect(locations, contains(DeviceLocation.leftThumb));
+      expect(locations, contains(DeviceLocation.rightIndexFinger));
+      expect(locations, contains(DeviceLocation.rightMiddleFinger));
+      expect(locations, contains(DeviceLocation.rightRingFinger));
+      expect(locations, contains(DeviceLocation.rightPinkyFinger));
+      expect(locations, contains(DeviceLocation.rightThumb));
+      expect(locations.length, 12);
+    });
+
+    test('availableLocationsFor armband includes upper arm locations', () {
+      final locations = Device.availableLocationsFor(DeviceType.armband);
+      expect(locations, contains(DeviceLocation.loose));
+      expect(locations, contains(DeviceLocation.charging));
+      expect(locations, contains(DeviceLocation.leftUpperArm));
+      expect(locations, contains(DeviceLocation.rightUpperArm));
+      expect(locations.length, 4);
+    });
+
+    test('availableLocationsFor chestStrap includes chest location', () {
+      final locations = Device.availableLocationsFor(DeviceType.chestStrap);
+      expect(locations, contains(DeviceLocation.loose));
+      expect(locations, contains(DeviceLocation.charging));
+      expect(locations, contains(DeviceLocation.chest));
+      expect(locations.length, 3);
+    });
+
+    test('availableLocationsFor headband includes head location', () {
+      final locations = Device.availableLocationsFor(DeviceType.headband);
+      expect(locations, contains(DeviceLocation.loose));
+      expect(locations, contains(DeviceLocation.charging));
+      expect(locations, contains(DeviceLocation.head));
+      expect(locations.length, 3);
+    });
+
+    test('availableLocationsFor other includes all locations', () {
+      final locations = Device.availableLocationsFor(DeviceType.other);
+      expect(locations, equals(DeviceLocation.values));
     });
   });
 }

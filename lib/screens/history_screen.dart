@@ -95,10 +95,29 @@ class _HistoryScreenState extends State<HistoryScreen> {
       await prefs.remove('worn_tracking');
 
       if (mounted) {
+        setState(() {
+          _lines = [];
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('All data wiped successfully')),
         );
-        _load();
+        await showDialog<void>(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            title: const Text('Restart Recommended'),
+            content: const Text(
+              'All data has been deleted.\n\n'
+              'To ensure any cached information is fully cleared, '
+              'it is recommended to restart the app.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(ctx).pop(),
+                child: const Text('OK'),
+              ),
+            ],
+          ),
+        );
       }
     }
   }

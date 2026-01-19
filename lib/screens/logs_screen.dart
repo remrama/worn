@@ -563,11 +563,23 @@ class _DeviceDialogState extends State<DeviceDialog> {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
     final sn = _snController.text.trim();
+
+    // Preserve existing location only if it's valid for the selected type,
+    // otherwise fall back to a safe default.
+    DeviceLocation location = DeviceLocation.loose;
+    if (widget.device != null) {
+      final existingLocation = widget.device!.location;
+      final availableLocations = Device.availableLocationsFor(_selectedType);
+      if (availableLocations.contains(existingLocation)) {
+        location = existingLocation;
+      }
+    }
+
     final device = Device(
       id: widget.device?.id,
       name: name,
       deviceType: _selectedType,
-      location: widget.device?.location ?? DeviceLocation.loose,
+      location: location,
       serialNumber: sn.isEmpty ? null : sn,
     );
     Navigator.pop(context, device);
