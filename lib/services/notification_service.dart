@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../models/event.dart';
 
@@ -9,7 +10,7 @@ class NotificationService {
   static NotificationService? _instance;
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
-  bool _initializing = false;
+  Completer<void>? _initCompleter;
 
   NotificationService._();
 
@@ -25,15 +26,12 @@ class NotificationService {
 
   Future<void> initialize() async {
     if (_initialized) return;
-    if (_initializing) {
+    if (_initCompleter != null) {
       // Wait for ongoing initialization to complete
-      while (_initializing) {
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
-      return;
+      return _initCompleter!.future;
     }
 
-    _initializing = true;
+    _initCompleter = Completer<void>();
     try {
       const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
       const initSettings = InitializationSettings(android: androidSettings);
@@ -56,17 +54,27 @@ class NotificationService {
           ?.createNotificationChannel(androidChannel);
 
       _initialized = true;
+      _initCompleter!.complete();
     } catch (e) {
       // Log error but don't crash - notifications are non-critical
-      // In production, consider using a logging service
+      // ignore: avoid_print
+      print('NotificationService initialization failed: $e');
+      _initCompleter!.completeError(e);
       _initialized = false;
     } finally {
-      _initializing = false;
+      _initCompleter = null;
     }
   }
 
   Future<void> updateNotification(List<Event> activeEvents) async {
-    if (!_initialized) await initialize();
+    if (!_initialized) {
+      try {
+        await initialize();
+      } catch (_) {
+        // If initialization fails, skip notification update
+        return;
+      }
+    }
 
     if (activeEvents.isEmpty) {
       await cancelNotification();
