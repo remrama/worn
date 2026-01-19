@@ -49,9 +49,17 @@ class NotificationService {
         showBadge: false,
       );
 
-      await _notifications
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-          ?.createNotificationChannel(androidChannel);
+      final androidPlugin = _notifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
+
+      await androidPlugin?.createNotificationChannel(androidChannel);
+
+      // Request notification permission on Android 13+ (API 33+)
+      final permissionGranted = await androidPlugin?.requestNotificationsPermission();
+      if (permissionGranted == false) {
+        // ignore: avoid_print
+        print('NotificationService: notification permission denied');
+      }
 
       _initialized = true;
       _initCompleter!.complete();
