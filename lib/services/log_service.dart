@@ -46,7 +46,7 @@ class LogService {
     final sn = device.serialNumber ?? 'none';
     final power = device.isPoweredOn ? 'on' : 'off';
     await _append(
-      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\t${device.name}\t${device.deviceType.name}\t${device.status.name}\t${device.location.name}\t$sn\t$power',
+      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\tname="${device.name}"\ttype=${device.deviceType.name}\tstatus=${device.status.name}\tlocation=${device.location.name}\tsn=$sn\tpower=$power',
     );
   }
 
