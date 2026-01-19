@@ -7,18 +7,35 @@
     <img src="./logo/banner.png" alt="Worn banner" width="300">
 </div>
 
-A minimal Flutter app for logging wearable device status and event detection.
+**Manual logging for creating ground-truth data to evaluate wearable device algorithms.**
+
+## What This Is
+
+Worn is a minimalist mobile app for manually logging when you wear a device and what you're doing. The output is a timestamped log file you can use as ground truth for evaluating wearable algorithms—wear-time detection, sleep/wake classification, activity recognition, etc.
+
+This is *not* automatic detection. It's the opposite: you manually log events so you have a reference to compare against automated outputs from commercial wearables or your own algorithms.
+
+## Who This Is For
+
+Researchers who need ground-truth data for wearable validation studies. Realistically, this is useful to maybe 5 people in the world. If you're evaluating Fitbit's sleep detection or building your own wear-time classifier, you need to know when someone *actually* went to bed or *actually* wore the device. Worn makes that logging less painful.
+
+## Primary Use Cases
+
+- **Wear-time validation**: Log when a device is on your body vs. loose/charging, to evaluate wear-time detection algorithms
+- **Sleep tracking validation**: Log bedtime, lights-out, and wake windows to compare against automatic sleep staging
+- **Activity labeling**: Mark activity windows (walking, running, etc.) as ground truth for activity classification
+
+## Design Philosophy
+
+Minimalist, borderline brutalist. No bells and whistles—just logging. The target audience is tiny and technical, so the UI prioritizes function over polish.
 
 ## Features
 
-- **Logs tab**: Unified view for devices and active events
-  - Add/edit devices with name and optional serial number
-  - Tap chip to set device location (loose, charging, or body part)
-  - Start/stop/cancel events with time window estimates for retroactive logging
-  - Add timestamped notes (general or device-specific)
-  - **Persistent notification**: Silent notification shows active events and their durations to remind you to stop them
-  - **Tracking toggle**: Pause/resume tracking to mark periods when logs may be unreliable
-- **History tab**: View raw log, copy to clipboard for parsing
+- **Logs tab**: Add devices, set their location (body part, loose, charging), start/stop events
+- **History tab**: View and export raw log for external parsing
+- **Persistent notifications**: Reminds you to stop active events so you don't forget
+- **Time windows**: Support for "earliest/latest" timestamps when logging retroactively
+- **Tracking toggle**: Pause logging during periods of unreliable data
 
 ## Event Types
 
