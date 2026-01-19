@@ -29,6 +29,14 @@ Researchers who need ground-truth data for wearable validation studies. Realisti
 
 Minimalist, borderline brutalist. No bells and whistles—just logging. The target audience is tiny and technical, so the UI prioritizes function over polish.
 
+## Try It / Install
+
+**Web (demo only)**: [worn-one.vercel.app](https://worn-one.vercel.app) — Good for a test drive, but not recommended for actual logging since this app requires frequent interaction and mobile access.
+
+**Android**: Download the APK from the [latest release](https://github.com/remrama/worn/releases/latest) and sideload it. To sideload, open the downloaded APK file on your Android device and follow the prompts—you may need to enable "Install from unknown sources" in your device settings. This is the recommended way to use Worn.
+
+**iOS**: Not available. No plans to support iOS.
+
 ## Features
 
 - **Logs tab**: Add devices, set their location (body part, loose, charging), start/stop events
@@ -56,41 +64,10 @@ Tab-separated with UTC ISO 8601 timestamps. Time windows use `..` separator:
 2024-01-17T09:00:00.000Z	TRACKING_RESUMED
 ```
 
-## Setup
+## Development
 
 ```bash
 flutter pub get
 flutter test
 flutter run
-```
-
-### Web Support
-
-This app now supports Flutter web! To build and run the web version:
-
-```bash
-flutter build web --release
-# Or run in development
-flutter run -d chrome
-```
-
-For maintainers: See [SETUP_VERCEL.md](SETUP_VERCEL.md) for instructions on configuring automatic web preview deployments for pull requests.
-
-## Structure
-
-```
-lib/
-├── main.dart
-├── models/
-│   ├── device.dart
-│   └── event.dart
-├── screens/
-│   ├── logs_screen.dart
-│   └── history_screen.dart
-└── services/
-    ├── device_store.dart
-    ├── event_store.dart
-    ├── log_service.dart
-    ├── notification_service.dart
-    └── tracking_service.dart
 ```
