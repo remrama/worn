@@ -35,7 +35,7 @@ class NotificationService {
     try {
       const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
       const initSettings = InitializationSettings(android: androidSettings);
-      
+
       await _notifications.initialize(initSettings);
 
       // Create notification channel for Android 8.0+
@@ -59,7 +59,9 @@ class NotificationService {
       // Log error but don't crash - notifications are non-critical
       // ignore: avoid_print
       print('NotificationService initialization failed: $e');
-      _initCompleter!.completeError(e);
+      // Complete normally (not with error) so callers don't need to handle exceptions
+      // The _initialized flag remains false, so notification operations will be skipped
+      _initCompleter!.complete();
       _initialized = false;
     } finally {
       _initCompleter = null;
@@ -68,12 +70,9 @@ class NotificationService {
 
   Future<void> updateNotification(List<Event> activeEvents) async {
     if (!_initialized) {
-      try {
-        await initialize();
-      } catch (_) {
-        // If initialization fails, skip notification update
-        return;
-      }
+      await initialize();
+      // If initialization failed, _initialized remains false - skip notification
+      if (!_initialized) return;
     }
 
     if (activeEvents.isEmpty) {

@@ -3,6 +3,10 @@ import 'package:worn/models/event.dart';
 import 'package:worn/services/notification_service.dart';
 
 void main() {
+  // Initialize Flutter binding before any tests run
+  // This is required for notification plugin's method channel setup
+  TestWidgetsFlutterBinding.ensureInitialized();
+
   group('NotificationService', () {
     setUp(() {
       // Reset the singleton to ensure clean state for each test
