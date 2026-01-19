@@ -6,7 +6,11 @@ import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.instance.initialize();
+  try {
+    await NotificationService.instance.initialize();
+  } catch (_) {
+    // Notification initialization failures should not prevent app startup
+  }
   runApp(const WornApp());
 }
 

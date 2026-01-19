@@ -9,6 +9,7 @@ class NotificationService {
   static NotificationService? _instance;
   final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
+  bool _initializing = false;
 
   NotificationService._();
 
@@ -17,30 +18,51 @@ class NotificationService {
     return _instance!;
   }
 
+  // Test-only method to reset the singleton state
+  static void resetForTesting() {
+    _instance = null;
+  }
+
   Future<void> initialize() async {
     if (_initialized) return;
+    if (_initializing) {
+      // Wait for ongoing initialization to complete
+      while (_initializing) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+      return;
+    }
 
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const initSettings = InitializationSettings(android: androidSettings);
-    
-    await _notifications.initialize(initSettings);
+    _initializing = true;
+    try {
+      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const initSettings = InitializationSettings(android: androidSettings);
+      
+      await _notifications.initialize(initSettings);
 
-    // Create notification channel for Android 8.0+
-    const androidChannel = AndroidNotificationChannel(
-      _channelId,
-      _channelName,
-      description: 'Persistent notifications for active events',
-      importance: Importance.low,
-      playSound: false,
-      enableVibration: false,
-      showBadge: false,
-    );
+      // Create notification channel for Android 8.0+
+      const androidChannel = AndroidNotificationChannel(
+        _channelId,
+        _channelName,
+        description: 'Persistent notifications for active events',
+        importance: Importance.low,
+        playSound: false,
+        enableVibration: false,
+        showBadge: false,
+      );
 
-    await _notifications
-        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
-        ?.createNotificationChannel(androidChannel);
+      await _notifications
+          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+          ?.createNotificationChannel(androidChannel);
 
-    _initialized = true;
+      _initialized = true;
+    } catch (e) {
+      // Log error but don't crash - notifications are non-critical
+      // In production, consider using a logging service
+      _initialized = false;
+    } finally {
+      _initializing = false;
+    }
   }
 
   Future<void> updateNotification(List<Event> activeEvents) async {
@@ -67,7 +89,6 @@ class NotificationService {
     final bigTextStyle = BigTextStyleInformation(
       lines.join('\n'),
       contentTitle: title,
-      summaryText: 'Tap to open app',
     );
 
     final androidDetails = AndroidNotificationDetails(
@@ -95,6 +116,7 @@ class NotificationService {
   }
 
   Future<void> cancelNotification() async {
+    if (!_initialized) return;
     await _notifications.cancel(_notificationId);
   }
 }

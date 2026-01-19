@@ -41,13 +41,21 @@ class EventStore {
     await _ensureLoaded();
     _events.add(event);
     await _save();
-    await NotificationService.instance.updateNotification(_events);
+    try {
+      await NotificationService.instance.updateNotification(_events);
+    } catch (_) {
+      // Notification failures should not prevent event tracking
+    }
   }
 
   Future<void> stopEvent(String id) async {
     await _ensureLoaded();
     _events.removeWhere((e) => e.id == id);
     await _save();
-    await NotificationService.instance.updateNotification(_events);
+    try {
+      await NotificationService.instance.updateNotification(_events);
+    } catch (_) {
+      // Notification failures should not prevent event tracking
+    }
   }
 }

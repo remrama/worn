@@ -43,7 +43,7 @@ class _LogsScreenState extends State<LogsScreen> {
       _events = events;
       _loading = false;
     });
-    // Update notification with current events (in case durations changed)
+    // Update notification to reflect current events with freshly calculated durations
     await NotificationService.instance.updateNotification(events);
   }
 
