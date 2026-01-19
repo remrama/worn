@@ -54,8 +54,10 @@ class NotificationService {
     final count = activeEvents.length;
     final title = count == 1 ? '1 active event' : '$count active events';
     
+    // Calculate current time once for all events
+    final now = DateTime.now().toUtc();
     final lines = activeEvents.map((e) {
-      final duration = DateTime.now().toUtc().difference(e.startEarliest);
+      final duration = now.difference(e.startEarliest);
       final hours = duration.inHours;
       final minutes = duration.inMinutes % 60;
       final durationStr = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
@@ -83,6 +85,7 @@ class NotificationService {
 
     final details = NotificationDetails(android: androidDetails);
 
+    // Show first event in collapsed view, all events in expanded view
     await _notifications.show(
       _notificationId,
       title,
