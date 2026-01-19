@@ -114,11 +114,11 @@ class _LogsScreenState extends State<LogsScreen> {
       try {
         await DeviceStore.instance.updateDevice(result.device!);
         if (_isTracking) {
-          // Log power change separately if it changed
+          await LogService.instance.logDeviceEdited(device, result.device!);
+          // Log power change separately if it changed, after the edit log
           if (device.isPoweredOn != result.device!.isPoweredOn) {
             await LogService.instance.logDevicePowerChanged(result.device!, result.device!.isPoweredOn);
           }
-          await LogService.instance.logDeviceEdited(device, result.device!);
         }
         _load();
       } catch (e) {
