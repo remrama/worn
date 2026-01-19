@@ -51,9 +51,17 @@ class _LogsScreenState extends State<LogsScreen> {
       builder: (ctx) => const DeviceDialog(),
     );
     if (result != null) {
-      await DeviceStore.instance.addDevice(result);
-      await LogService.instance.logDeviceAdded(result);
-      _load();
+      try {
+        await DeviceStore.instance.addDevice(result);
+        await LogService.instance.logDeviceAdded(result);
+        _load();
+      } catch (e) {
+        if (e.toString().contains('Device name must be unique')) {
+          _showDuplicateNameError();
+        } else {
+          rethrow;
+        }
+      }
     }
   }
 
@@ -63,9 +71,32 @@ class _LogsScreenState extends State<LogsScreen> {
       builder: (ctx) => DeviceDialog(device: device),
     );
     if (result != null) {
-      await DeviceStore.instance.updateDevice(result);
-      await LogService.instance.logDeviceEdited(device, result);
-      _load();
+      try {
+        await DeviceStore.instance.updateDevice(result);
+        await LogService.instance.logDeviceEdited(device, result);
+        _load();
+      } catch (e) {
+        if (e.toString().contains('Device name must be unique')) {
+          _showDuplicateNameError();
+        } else {
+          rethrow;
+        }
+      }
+    }
+  }
+
+  Future<void> _showDuplicateNameError() async {
+    if (mounted) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Error'),
+          content: const Text('Device name must be unique and cannot be the same as any active device.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
     }
   }
 
@@ -253,8 +284,22 @@ class _LogsScreenState extends State<LogsScreen> {
             )
           else
             ..._devices.map((d) => ListTile(
-                  title: Text(d.name),
-                  subtitle: d.serialNumber != null ? Text('SN: ${d.serialNumber}') : null,
+                  title: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(d.name),
+                      if (d.serialNumber != null)
+                        Text(
+                          d.serialNumber!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontFamily: 'monospace',
+                            color: Colors.grey,
+                          ),
+                        ),
+                    ],
+                  ),
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
