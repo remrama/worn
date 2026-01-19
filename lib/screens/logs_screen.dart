@@ -180,6 +180,25 @@ class _LogsScreenState extends State<LogsScreen> {
     }
   }
 
+  Future<void> _cancelEvent(Event event) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Cancel Event'),
+        content: Text('Cancel "${event.displayName}"? This will log that the event was cancelled.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('No')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Cancel Event')),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await EventStore.instance.stopEvent(event.id);
+      await LogService.instance.logEventCancelled(event);
+      _load();
+    }
+  }
+
   // Note method
   Future<void> _addNote() async {
     final note = await showDialog<String>(
@@ -340,10 +359,20 @@ class _LogsScreenState extends State<LogsScreen> {
                 leading: Icon(_iconFor(e.type)),
                 title: Text(e.displayName),
                 subtitle: Text('Started: ${_formatStartTime(e)} (${_formatDuration(duration)})'),
-                trailing: IconButton(
-                  icon: const Icon(Icons.stop, color: Colors.red),
-                  onPressed: () => _stopEvent(e),
-                  tooltip: 'Stop',
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      icon: const Icon(Icons.cancel, color: Colors.orange),
+                      onPressed: () => _cancelEvent(e),
+                      tooltip: 'Cancel',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.stop, color: Colors.red),
+                      onPressed: () => _stopEvent(e),
+                      tooltip: 'Stop',
+                    ),
+                  ],
                 ),
               );
             }),

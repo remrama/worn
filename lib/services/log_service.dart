@@ -15,6 +15,11 @@ class LogService {
     return _instance!;
   }
 
+  // Test-only method to reset the singleton state
+  static void resetForTesting() {
+    _instance = null;
+  }
+
   Future<void> _ensureLoaded() async {
     if (_prefs != null) return;
     _prefs = await SharedPreferences.getInstance();
@@ -103,6 +108,13 @@ class LogService {
     final stopWindow = _formatTimeWindow(stopEarliest, stopLatest);
     await _append(
       '${_timestamp()}\tEVENT_STOPPED\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow\t$stopWindow',
+    );
+  }
+
+  Future<void> logEventCancelled(Event event) async {
+    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
+    await _append(
+      '${_timestamp()}\tEVENT_CANCELLED\t${event.id}\t${event.type.name}\t${event.displayName}\t$startWindow',
     );
   }
 

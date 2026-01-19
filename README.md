@@ -14,7 +14,7 @@ A minimal Flutter app for logging wearable device status and event detection.
 - **Logs tab**: Unified view for devices and active events
   - Add/edit devices with name and optional serial number
   - Tap chip to set device location (loose, charging, or body part)
-  - Start/stop events with time window estimates for retroactive logging
+  - Start/stop/cancel events with time window estimates for retroactive logging
   - Add timestamped notes (general or device-specific)
 - **History tab**: View raw log, copy to clipboard for parsing
 
@@ -31,6 +31,7 @@ Tab-separated with UTC ISO 8601 timestamps. Time windows use `..` separator:
 2024-01-15T10:35:00.000Z	LOCATION_CHANGED	uuid	MyWatch	loose->leftWrist
 2024-01-15T11:00:00.000Z	EVENT_STARTED	uuid	walk	Walk	2024-01-15T11:00:00.000Z
 2024-01-15T11:30:00.000Z	EVENT_STOPPED	uuid	walk	Walk	2024-01-15T11:00:00.000Z	2024-01-15T11:25:00.000Z..2024-01-15T11:30:00.000Z
+2024-01-15T12:00:00.000Z	EVENT_CANCELLED	uuid	inBed	In Bed	2024-01-15T11:45:00.000Z
 2024-01-15T12:00:00.000Z	NOTE	User added a custom note
 ```
 
