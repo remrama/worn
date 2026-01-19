@@ -125,7 +125,7 @@ Uses `SharedPreferences` with these keys:
 
 Tab-separated entries with UTC ISO 8601 timestamps. Time windows use `..` separator. Uses internal variable names for parsing efficiency:
 ```
-2024-01-15T10:30:00.000Z	DEVICE_ADDED	uuid	MyWatch	watch	loose	leftWrist	SN123
+2024-01-15T10:30:00.000Z	DEVICE_ADDED	uuid	MyWatch	watch	loose	leftWrist	SN123	on
 2024-01-15T10:35:00.000Z	STATUS_CHANGED	uuid	MyWatch	worn
 2024-01-15T10:36:00.000Z	LOCATION_CHANGED	uuid	MyWatch	rightWrist
 2024-01-15T10:40:00.000Z	POWER_CHANGED	uuid	MyWatch	off
