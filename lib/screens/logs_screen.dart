@@ -73,14 +73,14 @@ class _LogsScreenState extends State<LogsScreen> {
       _showTrackingPausedWarning();
       return;
     }
-    final result = await showDialog<Device>(
+    final result = await showDialog<DeviceDialogResult>(
       context: context,
       builder: (ctx) => const DeviceDialog(),
     );
-    if (result != null) {
+    if (result != null && result.device != null) {
       try {
-        await DeviceStore.instance.addDevice(result);
-        await LogService.instance.logDeviceAdded(result);
+        await DeviceStore.instance.addDevice(result.device!);
+        await LogService.instance.logDeviceAdded(result.device!);
         _load();
       } catch (e) {
         if (e.toString().contains('Device name must be unique')) {
@@ -93,15 +93,32 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Future<void> _editDevice(Device device) async {
-    final result = await showDialog<Device>(
+    final result = await showDialog<DeviceDialogResult>(
       context: context,
       builder: (ctx) => DeviceDialog(device: device),
     );
-    if (result != null) {
+    if (result == null) return;
+
+    if (result.deleteRequested) {
+      if (!_isTracking) {
+        _showTrackingPausedWarning();
+        return;
+      }
+      await DeviceStore.instance.deleteDevice(device.id);
+      await LogService.instance.logDeviceDeleted(device);
+      _load();
+      return;
+    }
+
+    if (result.device != null) {
       try {
-        await DeviceStore.instance.updateDevice(result);
+        await DeviceStore.instance.updateDevice(result.device!);
         if (_isTracking) {
-          await LogService.instance.logDeviceEdited(device, result);
+          await LogService.instance.logDeviceEdited(device, result.device!);
+          // Log power change separately if it changed, after the edit log
+          if (device.isPoweredOn != result.device!.isPoweredOn) {
+            await LogService.instance.logDevicePowerChanged(result.device!, result.device!.isPoweredOn);
+          }
         }
         _load();
       } catch (e) {
@@ -144,29 +161,6 @@ class _LogsScreenState extends State<LogsScreen> {
     }
   }
 
-  Future<void> _deleteDevice(Device device) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Delete Device'),
-        content: Text('Delete "${device.name}"?'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
-        ],
-      ),
-    );
-    if (confirm == true) {
-      await DeviceStore.instance.deleteDevice(device.id);
-      await LogService.instance.logDeviceDeleted(device);
-      _load();
-    }
-  }
-
   Future<void> _changeLocation(Device device) async {
     if (!_isTracking) {
       _showTrackingPausedWarning();
@@ -186,17 +180,6 @@ class _LogsScreenState extends State<LogsScreen> {
       await LogService.instance.logLocationChanged(device, oldLocation, newLocation);
       _load();
     }
-  }
-
-  Future<void> _toggleDevicePower(Device device) async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
-    final newDevice = device.copyWith(isPoweredOn: !device.isPoweredOn);
-    await DeviceStore.instance.updateDevice(newDevice);
-    await LogService.instance.logDevicePowerChanged(newDevice, newDevice.isPoweredOn);
-    _load();
   }
 
   Future<void> _addDeviceNote(Device device) async {
@@ -449,11 +432,6 @@ class _LogsScreenState extends State<LogsScreen> {
                   trailing: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Switch(
-                        value: d.isPoweredOn,
-                        onChanged: (_) => _toggleDevicePower(d),
-                      ),
-                      const SizedBox(width: 4),
                       _locationChip(d),
                       IconButton(
                         icon: const Icon(Icons.note_add, size: 20),
@@ -464,11 +442,6 @@ class _LogsScreenState extends State<LogsScreen> {
                         icon: const Icon(Icons.edit, size: 20),
                         onPressed: () => _editDevice(d),
                         tooltip: 'Edit',
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.delete, size: 20),
-                        onPressed: () => _deleteDevice(d),
-                        tooltip: 'Delete',
                       ),
                     ],
                   ),
@@ -545,6 +518,15 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 }
 
+// Device dialog result
+class DeviceDialogResult {
+  final Device? device;
+  final bool deleteRequested;
+
+  DeviceDialogResult.save(Device this.device) : deleteRequested = false;
+  DeviceDialogResult.delete() : device = null, deleteRequested = true;
+}
+
 // Device dialogs
 class DeviceDialog extends StatefulWidget {
   final Device? device;
@@ -558,6 +540,7 @@ class _DeviceDialogState extends State<DeviceDialog> {
   final _nameController = TextEditingController();
   final _snController = TextEditingController();
   late DeviceType _selectedType;
+  late bool _isPoweredOn;
 
   @override
   void initState() {
@@ -566,8 +549,10 @@ class _DeviceDialogState extends State<DeviceDialog> {
       _nameController.text = widget.device!.name;
       _snController.text = widget.device!.serialNumber ?? '';
       _selectedType = widget.device!.deviceType;
+      _isPoweredOn = widget.device!.isPoweredOn;
     } else {
       _selectedType = DeviceType.watch;
+      _isPoweredOn = true;
     }
   }
 
@@ -600,8 +585,26 @@ class _DeviceDialogState extends State<DeviceDialog> {
       deviceType: _selectedType,
       location: location,
       serialNumber: sn.isEmpty ? null : sn,
+      isPoweredOn: _isPoweredOn,
     );
-    Navigator.pop(context, device);
+    Navigator.pop(context, DeviceDialogResult.save(device));
+  }
+
+  Future<void> _confirmDelete() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Delete Device'),
+        content: Text('Delete "${widget.device!.name}"?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirm == true && mounted) {
+      Navigator.pop(context, DeviceDialogResult.delete());
+    }
   }
 
   @override
@@ -645,6 +648,23 @@ class _DeviceDialogState extends State<DeviceDialog> {
               controller: _snController,
               decoration: const InputDecoration(labelText: 'Serial Number (optional)'),
             ),
+            const SizedBox(height: 16),
+            const Divider(),
+            SwitchListTile(
+              title: const Text('Powered On'),
+              value: _isPoweredOn,
+              onChanged: (v) => setState(() => _isPoweredOn = v),
+              contentPadding: EdgeInsets.zero,
+            ),
+            if (isEdit) ...[
+              const Divider(),
+              ListTile(
+                leading: const Icon(Icons.delete, color: Colors.red),
+                title: const Text('Delete Device', style: TextStyle(color: Colors.red)),
+                onTap: _confirmDelete,
+                contentPadding: EdgeInsets.zero,
+              ),
+            ],
           ],
         ),
       ),
