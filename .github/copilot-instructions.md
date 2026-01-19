@@ -4,9 +4,26 @@ This document provides guidance for the GitHub Copilot coding agent to work effi
 
 ## Repository Overview
 
-**Worn** is a minimal Flutter mobile application for logging wearable device status and event detection. It allows users to manage wearable devices (smartwatches, fitness trackers), track device location (loose, charging, or body placement), and export event logs in tab-separated format.
+**Worn** is a minimalist Flutter app for manually logging wearable device status and events. The output is a timestamped log file that serves as ground-truth data for evaluating wearable algorithms (wear-time detection, sleep/wake classification, activity recognition).
 
-- **Type**: Flutter mobile application (Android target)
+### Purpose
+
+This is *not* automatic detection—it's the opposite. Researchers manually log when they wear a device and what they're doing, creating reference data to compare against automated outputs from commercial wearables or custom algorithms.
+
+### Target Audience
+
+Researchers validating wearable algorithms. Realistically ~5 people. Primary use cases:
+- **Wear-time validation**: Log when a device is on-body vs. loose/charging
+- **Sleep tracking validation**: Log bedtime, lights-out, and wake windows
+- **Activity labeling**: Mark activity windows as ground truth
+
+### Design Philosophy
+
+Minimalist, borderline brutalist. The tiny, technical audience means UI prioritizes function over polish. No feature creep—just logging.
+
+### Technical Details
+
+- **Type**: Flutter mobile application (Android/Web)
 - **Language**: Dart
 - **SDK**: Flutter stable channel, Dart SDK >=3.0.0 <4.0.0
 - **Size**: Small (~15 source files)

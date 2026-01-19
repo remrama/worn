@@ -4,7 +4,30 @@ This file provides guidance to Claude Code (claude.ai/claude-code) when working 
 
 ## Project Overview
 
-**Worn** is a minimal Flutter application for logging wearable device status and event detection. It allows users to add/manage wearable devices (smartwatches, fitness trackers, rings, etc.), track device location (loose, charging, or body placement), track device power state (on/off), and export event logs in tab-separated format for external analysis. Device types determine available wear locations, and the app includes persistent notifications for active events.
+**Worn** is a minimalist Flutter app for manually logging wearable device status and events. The output is a timestamped log file that serves as ground-truth data for evaluating wearable algorithms (wear-time detection, sleep/wake classification, activity recognition).
+
+### Purpose
+
+This is *not* automatic detection—it's the opposite. Researchers manually log when they wear a device and what they're doing, creating reference data to compare against automated outputs from commercial wearables or custom algorithms.
+
+### Target Audience
+
+Researchers validating wearable algorithms. Realistically ~5 people. Primary use cases:
+- **Wear-time validation**: Log when a device is on-body vs. loose/charging
+- **Sleep tracking validation**: Log bedtime, lights-out, and wake windows
+- **Activity labeling**: Mark activity windows as ground truth
+
+### Design Philosophy
+
+Minimalist, borderline brutalist. The tiny, technical audience means UI prioritizes function over polish. No feature creep—just logging.
+
+### Core Functionality
+
+- Add/manage wearable devices (watches, rings, bands, etc.)
+- Track device location (loose, charging, or body placement) and power state
+- Start/stop events with optional time windows for retroactive logging
+- Export tab-separated logs for external analysis
+- Persistent notifications to prevent forgetting active events
 
 ## Key Commands
 
