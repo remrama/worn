@@ -1,4 +1,7 @@
-name: Build Android APK
+name: Build Android APK (Development)
+
+# This workflow builds development APKs for testing from main branch between releases.
+# For production releases, use the release.yml workflow with version tags.
 
 on:
   push:
