@@ -15,6 +15,9 @@ class LogsScreen extends StatefulWidget {
 }
 
 class _LogsScreenState extends State<LogsScreen> {
+  static const String _trackingPausedMessage = 
+      'Logging is currently paused. Enable tracking to add devices, events, or notes.';
+  
   List<Device> _devices = [];
   List<Event> _events = [];
   bool _loading = true;
@@ -131,7 +134,7 @@ class _LogsScreenState extends State<LogsScreen> {
         context: context,
         builder: (ctx) => AlertDialog(
           title: const Text('Tracking Paused'),
-          content: const Text('Logging is currently paused. Enable tracking to add devices, events, or notes.'),
+          content: const Text(_trackingPausedMessage),
           actions: [
             TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
           ],
