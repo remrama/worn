@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/event.dart';
+import 'notification_service.dart';
 
 class EventStore {
   static const _key = 'worn_active_events';
@@ -40,11 +41,21 @@ class EventStore {
     await _ensureLoaded();
     _events.add(event);
     await _save();
+    try {
+      await NotificationService.instance.updateNotification(_events);
+    } catch (_) {
+      // Notification failures should not prevent event tracking
+    }
   }
 
   Future<void> stopEvent(String id) async {
     await _ensureLoaded();
     _events.removeWhere((e) => e.id == id);
     await _save();
+    try {
+      await NotificationService.instance.updateNotification(_events);
+    } catch (_) {
+      // Notification failures should not prevent event tracking
+    }
   }
 }

@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'screens/logs_screen.dart';
 import 'screens/history_screen.dart';
+import 'services/notification_service.dart';
 
-void main() {
+void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    await NotificationService.instance.initialize();
+  } catch (_) {
+    // Notification initialization failures should not prevent app startup
+  }
   runApp(const WornApp());
 }
 

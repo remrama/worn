@@ -5,6 +5,7 @@ import '../models/event.dart';
 import '../services/device_store.dart';
 import '../services/event_store.dart';
 import '../services/log_service.dart';
+import '../services/notification_service.dart';
 import '../services/tracking_service.dart';
 
 class LogsScreen extends StatefulWidget {
@@ -49,6 +50,8 @@ class _LogsScreenState extends State<LogsScreen> {
       _isTracking = isTracking;
       _loading = false;
     });
+    // Update notification to reflect current events with freshly calculated durations
+    await NotificationService.instance.updateNotification(events);
   }
 
   Future<void> _toggleTracking() async {
