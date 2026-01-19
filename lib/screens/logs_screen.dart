@@ -648,15 +648,15 @@ class _DeviceDialogState extends State<DeviceDialog> {
               controller: _snController,
               decoration: const InputDecoration(labelText: 'Serial Number (optional)'),
             ),
+            const SizedBox(height: 16),
+            const Divider(),
+            SwitchListTile(
+              title: const Text('Powered On'),
+              value: _isPoweredOn,
+              onChanged: (v) => setState(() => _isPoweredOn = v),
+              contentPadding: EdgeInsets.zero,
+            ),
             if (isEdit) ...[
-              const SizedBox(height: 16),
-              const Divider(),
-              SwitchListTile(
-                title: const Text('Powered On'),
-                value: _isPoweredOn,
-                onChanged: (v) => setState(() => _isPoweredOn = v),
-                contentPadding: EdgeInsets.zero,
-              ),
               const Divider(),
               ListTile(
                 leading: const Icon(Icons.delete, color: Colors.red),
