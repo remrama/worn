@@ -16,8 +16,8 @@ class LogsScreen extends StatefulWidget {
 }
 
 class _LogsScreenState extends State<LogsScreen> {
-  static const String _trackingPausedMessage = 
-      'Logging is currently paused. Enable tracking to add devices, events, or notes.';
+  static const String _trackingPausedMessage =
+      'Tracking is paused. Status changes, events, and notes require tracking to be enabled.';
   
   List<Device> _devices = [];
   List<Event> _events = [];
@@ -69,10 +69,6 @@ class _LogsScreenState extends State<LogsScreen> {
 
   // Device methods
   Future<void> _addDevice() async {
-    if (!_isTracking) {
-      _showTrackingPausedWarning();
-      return;
-    }
     final result = await showDialog<DeviceDialogResult>(
       context: context,
       builder: (ctx) => const DeviceDialog(),
@@ -95,15 +91,11 @@ class _LogsScreenState extends State<LogsScreen> {
   Future<void> _editDevice(Device device) async {
     final result = await showDialog<DeviceDialogResult>(
       context: context,
-      builder: (ctx) => DeviceDialog(device: device),
+      builder: (ctx) => DeviceDialog(device: device, isTracking: _isTracking),
     );
     if (result == null) return;
 
     if (result.deleteRequested) {
-      if (!_isTracking) {
-        _showTrackingPausedWarning();
-        return;
-      }
       await DeviceStore.instance.deleteDevice(device.id);
       await LogService.instance.logDeviceDeleted(device);
       _load();
@@ -113,16 +105,14 @@ class _LogsScreenState extends State<LogsScreen> {
     if (result.device != null) {
       try {
         await DeviceStore.instance.updateDevice(result.device!);
-        if (_isTracking) {
-          await LogService.instance.logDeviceEdited(device, result.device!);
-          // Log power change separately if it changed
-          if (device.isPoweredOn != result.device!.isPoweredOn) {
-            await LogService.instance.logDevicePowerChanged(result.device!, result.device!.isPoweredOn);
-          }
-          // Log location change separately if it changed
-          if (device.location != result.device!.location) {
-            await LogService.instance.logLocationChanged(result.device!, result.device!.location);
-          }
+        await LogService.instance.logDeviceEdited(device, result.device!);
+        // Log power change separately if it changed
+        if (device.isPoweredOn != result.device!.isPoweredOn) {
+          await LogService.instance.logDevicePowerChanged(result.device!, result.device!.isPoweredOn);
+        }
+        // Log location change separately if it changed
+        if (device.location != result.device!.location) {
+          await LogService.instance.logLocationChanged(result.device!, result.device!.location);
         }
         _load();
       } catch (e) {
@@ -531,7 +521,8 @@ class DeviceDialogResult {
 // Device dialogs
 class DeviceDialog extends StatefulWidget {
   final Device? device;
-  const DeviceDialog({super.key, this.device});
+  final bool isTracking;
+  const DeviceDialog({super.key, this.device, this.isTracking = true});
 
   @override
   State<DeviceDialog> createState() => _DeviceDialogState();
@@ -650,7 +641,10 @@ class _DeviceDialogState extends State<DeviceDialog> {
             ),
             const SizedBox(height: 12),
             InputDecorator(
-              decoration: const InputDecoration(labelText: 'Body Location'),
+              decoration: InputDecoration(
+                labelText: 'Body Location',
+                helperText: (isEdit && !widget.isTracking) ? 'Enable tracking to change' : null,
+              ),
               child: DropdownButton<DeviceLocation>(
                 value: _selectedLocation,
                 isExpanded: true,
@@ -661,11 +655,14 @@ class _DeviceDialogState extends State<DeviceDialog> {
                     child: Text(Device.locationLabel(loc)),
                   );
                 }).toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _selectedLocation = value);
-                  }
-                },
+                // Disable location changes when editing with tracking paused
+                onChanged: (isEdit && !widget.isTracking)
+                    ? null
+                    : (value) {
+                        if (value != null) {
+                          setState(() => _selectedLocation = value);
+                        }
+                      },
               ),
             ),
             const SizedBox(height: 12),
