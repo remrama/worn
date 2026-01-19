@@ -15,6 +15,11 @@ class LogService {
     return _instance!;
   }
 
+  // Test-only method to reset the singleton state
+  static void resetForTesting() {
+    _instance = null;
+  }
+
   Future<void> _ensureLoaded() async {
     if (_prefs != null) return;
     _prefs = await SharedPreferences.getInstance();

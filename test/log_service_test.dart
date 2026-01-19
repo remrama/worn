@@ -8,6 +8,8 @@ void main() {
     setUp(() async {
       // Clear shared preferences before each test
       SharedPreferences.setMockInitialValues({});
+      // Reset the singleton to ensure clean state for each test
+      LogService.resetForTesting();
     });
 
     test('logEventCancelled creates EVENT_CANCELLED log entry', () async {
