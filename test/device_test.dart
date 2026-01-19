@@ -104,6 +104,7 @@ void main() {
       };
       final chargingDevice = Device.fromMap(chargingMap);
       expect(chargingDevice.status, DeviceStatus.charging);
+      expect(chargingDevice.location, DeviceLocation.leftWrist); // default for watch
 
       // Old format: location was body part (means worn)
       final wornMap = {
@@ -129,6 +130,7 @@ void main() {
       };
       final looseDevice = Device.fromMap(looseMap);
       expect(looseDevice.status, DeviceStatus.loose);
+      expect(looseDevice.location, DeviceLocation.leftWrist); // default for watch
 
       // Very old format: charging status
       final chargingMap = {
@@ -140,6 +142,7 @@ void main() {
       };
       final chargingDevice = Device.fromMap(chargingMap);
       expect(chargingDevice.status, DeviceStatus.charging);
+      expect(chargingDevice.location, DeviceLocation.leftWrist); // default for watch
 
       // Very old format: worn status (uses placement)
       final wornMap = {
