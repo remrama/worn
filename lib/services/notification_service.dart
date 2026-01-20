@@ -18,19 +18,23 @@ class EventNotificationAction {
 /// Top-level callback for notification actions - must be top-level for background execution.
 @pragma('vm:entry-point')
 Future<void> _onNotificationActionReceived(ReceivedAction receivedAction) async {
-  final actionKey = receivedAction.buttonKeyPressed;
-  if (actionKey.isEmpty) return;
+  try {
+    final actionKey = receivedAction.buttonKeyPressed;
+    if (actionKey.isEmpty) return;
 
-  // Handle device status actions (silent, background)
-  if (actionKey.startsWith('status_')) {
-    await _handleDeviceStatusAction(actionKey);
-    return;
-  }
+    // Handle device status actions (silent, background)
+    if (actionKey.startsWith('status_')) {
+      await _handleDeviceStatusAction(actionKey);
+      return;
+    }
 
-  // Handle event actions (opens app, emits to stream for UI to handle)
-  if (actionKey.startsWith('event_')) {
-    await _handleEventAction(actionKey);
-    return;
+    // Handle event actions (opens app, emits to stream for UI to handle)
+    if (actionKey.startsWith('event_')) {
+      await _handleEventAction(actionKey);
+      return;
+    }
+  } catch (e) {
+    debugPrint('Error in notification action callback: $e');
   }
 }
 
@@ -297,14 +301,14 @@ class NotificationService {
 
   Future<void> cancelNotification() async {
     if (!_initialized) return;
-    // Cancel all active notifications - this is a no-op now since we manage individual events
-    // The caller should use cancelAllEventNotifications instead
+    // Cancel all event notifications on this channel
+    await AwesomeNotifications().cancelNotificationsByChannelKey(_eventsChannelKey);
   }
 
   // --- Device Notification Methods ---
 
   /// Generate a unique notification ID for a device based on its UUID.
-  /// IDs start at 1000 to avoid conflicts with the events notification (ID 1).
+  /// Device IDs start at 1000 and event IDs start at 2000 to avoid conflicts.
   int _deviceNotificationId(String deviceId) {
     return 1000 + deviceId.hashCode.abs() % 100000;
   }

@@ -35,10 +35,18 @@ class _LogsScreenState extends State<LogsScreen> {
     _durationTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
-    _statusSubscription = NotificationService.instance.onDeviceStatusChanged.listen((_) {
-      _load();
-    });
-    _eventActionSubscription = NotificationService.instance.onEventAction.listen(_handleEventAction);
+    _statusSubscription = NotificationService.instance.onDeviceStatusChanged.listen(
+      (_) => _load(),
+      onError: (Object error) {
+        debugPrint('Error in onDeviceStatusChanged stream: $error');
+      },
+    );
+    _eventActionSubscription = NotificationService.instance.onEventAction.listen(
+      _handleEventAction,
+      onError: (Object error) {
+        debugPrint('Error in onEventAction stream: $error');
+      },
+    );
   }
 
   @override
@@ -68,6 +76,8 @@ class _LogsScreenState extends State<LogsScreen> {
         _stopEvent(event);
       case 'cancel':
         _cancelEvent(event);
+      default:
+        debugPrint('Unknown event action: ${action.action}');
     }
   }
 
@@ -82,6 +92,8 @@ class _LogsScreenState extends State<LogsScreen> {
       _loading = false;
     });
     // Update notifications only when tracking is active
+    // Check mounted to avoid unnecessary work after widget disposal
+    if (!mounted) return;
     if (isTracking) {
       await NotificationService.instance.updateAllEventNotifications(events);
       await NotificationService.instance.updateAllDeviceNotifications(devices);
