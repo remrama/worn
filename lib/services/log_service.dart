@@ -34,7 +34,19 @@ class LogService {
     await _prefs!.setString(_key, _logLines.join('\n'));
   }
 
-  String _timestamp() => DateTime.now().toUtc().toIso8601String();
+  /// Formats a DateTime as ISO 8601 with timezone offset (e.g., 2024-01-15T10:30:00.000-05:00)
+  String _formatDateTime(DateTime dt) {
+    final local = dt.toLocal();
+    final offset = local.timeZoneOffset;
+    final sign = offset.isNegative ? '-' : '+';
+    final hours = offset.inHours.abs().toString().padLeft(2, '0');
+    final minutes = (offset.inMinutes.abs() % 60).toString().padLeft(2, '0');
+    // Dart's toIso8601String on local time omits timezone, so we append it
+    final isoBase = local.toIso8601String();
+    return '$isoBase$sign$hours:$minutes';
+  }
+
+  String _timestamp() => _formatDateTime(DateTime.now());
 
   Future<void> _append(String line) async {
     await _ensureLoaded();
@@ -97,19 +109,19 @@ class LogService {
   Future<void> logNote(String note, {Device? device, Event? event}) async {
     final sanitized = note.replaceAll('\t', ' ').replaceAll('\n', ' ');
     if (device != null) {
-      await _append('${_timestamp()}\tNOTE\t${device.id}\t${device.name}\t$sanitized');
+      await _append('${_timestamp()}\tDEVICE_NOTE\t${device.id}\t${device.name}\t$sanitized');
     } else if (event != null) {
-      await _append('${_timestamp()}\tNOTE\t${event.id}\t${event.displayName}\t$sanitized');
+      await _append('${_timestamp()}\tACTIVITY_NOTE\t${event.id}\t${event.displayName}\t$sanitized');
     } else {
-      await _append('${_timestamp()}\tNOTE\t$sanitized');
+      await _append('${_timestamp()}\tGLOBAL_NOTE\t$sanitized');
     }
   }
 
   String _formatTimeWindow(DateTime earliest, DateTime latest) {
     if (earliest == latest) {
-      return earliest.toIso8601String();
+      return _formatDateTime(earliest);
     }
-    return '${earliest.toIso8601String()}..${latest.toIso8601String()}';
+    return 'earliest=${_formatDateTime(earliest)}\tlatest=${_formatDateTime(latest)}';
   }
 
   Future<void> logEventStarted(Event event) async {
@@ -132,9 +144,8 @@ class LogService {
   }
 
   Future<void> logEventCancelled(Event event) async {
-    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
     await _append(
-      '${_timestamp()}\tEVENT_CANCELLED\t${event.id}\t${event.type.name}\t$startWindow',
+      '${_timestamp()}\tEVENT_CANCELLED\t${event.id}\t${event.type.name}',
     );
   }
 
