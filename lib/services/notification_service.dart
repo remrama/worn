@@ -1,30 +1,71 @@
 import 'dart:async';
-import 'package:flutter/widgets.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:awesome_notifications/awesome_notifications.dart';
 import '../models/device.dart';
 import '../models/event.dart';
 import 'device_store.dart';
 import 'log_service.dart';
 import 'tracking_service.dart';
 
-/// Top-level handler for background notification responses.
-/// Must be a top-level function for background execution.
+/// Top-level callback for notification actions - must be top-level for background execution.
 @pragma('vm:entry-point')
-void _handleBackgroundNotificationResponse(NotificationResponse response) async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await NotificationService.instance._processNotificationAction(response);
+Future<void> _onNotificationActionReceived(ReceivedAction receivedAction) async {
+  final actionKey = receivedAction.buttonKeyPressed;
+  if (actionKey.isEmpty) return;
+
+  // Parse action key format: status_worn_{deviceId}, status_loose_{deviceId}, status_charging_{deviceId}
+  if (!actionKey.startsWith('status_')) return;
+
+  final parts = actionKey.split('_');
+  if (parts.length < 3) return;
+
+  final statusStr = parts[1];
+  final deviceId = parts.sublist(2).join('_'); // Handle device IDs with underscores
+
+  DeviceStatus? newStatus;
+  switch (statusStr) {
+    case 'worn':
+      newStatus = DeviceStatus.worn;
+    case 'loose':
+      newStatus = DeviceStatus.loose;
+    case 'charging':
+      newStatus = DeviceStatus.charging;
+    default:
+      return;
+  }
+
+  // Check if tracking is enabled - ignore actions when paused
+  final isTracking = await TrackingService.instance.isTracking();
+  if (!isTracking) return;
+
+  // Load the device
+  final devices = await DeviceStore.instance.getDevices();
+  final device = devices.where((d) => d.id == deviceId).firstOrNull;
+  if (device == null) return;
+
+  // Skip if status is unchanged
+  if (device.status == newStatus) return;
+
+  // Update the device status
+  final updatedDevice = device.copyWith(status: newStatus);
+  await DeviceStore.instance.updateDevice(updatedDevice);
+  await LogService.instance.logDeviceUpdated(device, updatedDevice);
+
+  // Update the notification to reflect new status
+  await NotificationService.instance.updateDeviceNotification(updatedDevice);
+
+  // Emit event for UI refresh (only works if app is in foreground)
+  NotificationService.instance._emitDeviceStatusChanged(deviceId);
 }
 
 class NotificationService {
-  static const _channelId = 'active_events';
-  static const _channelName = 'Active Events';
-  static const _notificationId = 1;
+  static const _eventsChannelKey = 'active_events';
+  static const _eventsChannelName = 'Active Events';
+  static const _eventsNotificationId = 1;
 
-  static const _deviceChannelId = 'device_status';
+  static const _deviceChannelKey = 'device_status';
   static const _deviceChannelName = 'Device Status';
 
   static NotificationService? _instance;
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
   Completer<void>? _initCompleter;
 
@@ -36,6 +77,7 @@ class NotificationService {
 
   NotificationService._();
 
+  @pragma('vm:entry-point')
   static NotificationService get instance {
     _instance ??= NotificationService._();
     return _instance!;
@@ -44,6 +86,11 @@ class NotificationService {
   // Test-only method to reset the singleton state
   static void resetForTesting() {
     _instance = null;
+  }
+
+  /// Internal method to emit device status changed event (called from top-level callback)
+  void _emitDeviceStatusChanged(String deviceId) {
+    _deviceStatusChangedController.add(deviceId);
   }
 
   Future<void> initialize() async {
@@ -55,48 +102,37 @@ class NotificationService {
 
     _initCompleter = Completer<void>();
     try {
-      const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-      const initSettings = InitializationSettings(android: androidSettings);
-
-      await _notifications.initialize(
-        initSettings,
-        onDidReceiveNotificationResponse: _processNotificationAction,
-        onDidReceiveBackgroundNotificationResponse: _handleBackgroundNotificationResponse,
+      await AwesomeNotifications().initialize(
+        null, // Use default app icon
+        [
+          NotificationChannel(
+            channelKey: _eventsChannelKey,
+            channelName: _eventsChannelName,
+            channelDescription: 'Persistent notifications for active events',
+            importance: NotificationImportance.Low,
+            playSound: false,
+            enableVibration: false,
+          ),
+          NotificationChannel(
+            channelKey: _deviceChannelKey,
+            channelName: _deviceChannelName,
+            channelDescription: 'Persistent notifications for device status with quick toggle buttons',
+            importance: NotificationImportance.Low,
+            playSound: false,
+            enableVibration: false,
+          ),
+        ],
       );
 
-      // Create notification channel for active events
-      const androidChannel = AndroidNotificationChannel(
-        _channelId,
-        _channelName,
-        description: 'Persistent notifications for active events',
-        importance: Importance.low,
-        playSound: false,
-        enableVibration: false,
-        showBadge: false,
+      // Set up action listeners with top-level callback
+      await AwesomeNotifications().setListeners(
+        onActionReceivedMethod: _onNotificationActionReceived,
       );
 
-      // Create notification channel for device status
-      const deviceChannel = AndroidNotificationChannel(
-        _deviceChannelId,
-        _deviceChannelName,
-        description: 'Persistent notifications for device status with quick toggle buttons',
-        importance: Importance.low,
-        playSound: false,
-        enableVibration: false,
-        showBadge: false,
-      );
-
-      final androidPlugin = _notifications
-          .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>();
-
-      await androidPlugin?.createNotificationChannel(androidChannel);
-      await androidPlugin?.createNotificationChannel(deviceChannel);
-
-      // Request notification permission on Android 13+ (API 33+)
-      final permissionGranted = await androidPlugin?.requestNotificationsPermission();
-      if (permissionGranted == false) {
-        // ignore: avoid_print
-        print('NotificationService: notification permission denied');
+      // Request notification permission
+      final isAllowed = await AwesomeNotifications().isNotificationAllowed();
+      if (!isAllowed) {
+        await AwesomeNotifications().requestPermissionToSendNotifications();
       }
 
       _initialized = true;
@@ -105,8 +141,6 @@ class NotificationService {
       // Log error but don't crash - notifications are non-critical
       // ignore: avoid_print
       print('NotificationService initialization failed: $e');
-      // Complete normally (not with error) so callers don't need to handle exceptions
-      // The _initialized flag remains false, so notification operations will be skipped
       _initCompleter!.complete();
       _initialized = false;
     } finally {
@@ -117,7 +151,6 @@ class NotificationService {
   Future<void> updateNotification(List<Event> activeEvents) async {
     if (!_initialized) {
       await initialize();
-      // If initialization failed, _initialized remains false - skip notification
       if (!_initialized) return;
     }
 
@@ -128,7 +161,7 @@ class NotificationService {
 
     final count = activeEvents.length;
     final title = count == 1 ? '1 active event' : '$count active events';
-    
+
     // Calculate current time once for all events
     final now = DateTime.now().toUtc();
     final lines = activeEvents.map((e) {
@@ -139,38 +172,22 @@ class NotificationService {
       return '${e.displayName} ($durationStr)';
     }).toList();
 
-    final bigTextStyle = BigTextStyleInformation(
-      lines.join('\n'),
-      contentTitle: title,
-    );
-
-    final androidDetails = AndroidNotificationDetails(
-      _channelId,
-      _channelName,
-      channelDescription: 'Persistent notifications for active events',
-      importance: Importance.low,
-      priority: Priority.low,
-      ongoing: true,
-      autoCancel: false,
-      playSound: false,
-      enableVibration: false,
-      styleInformation: bigTextStyle,
-    );
-
-    final details = NotificationDetails(android: androidDetails);
-
-    // Show first event in collapsed view, all events in expanded view
-    await _notifications.show(
-      _notificationId,
-      title,
-      lines.first,
-      details,
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: _eventsNotificationId,
+        channelKey: _eventsChannelKey,
+        title: title,
+        body: lines.join('\n'),
+        notificationLayout: NotificationLayout.BigText,
+        locked: true, // Makes it ongoing/persistent
+        autoDismissible: false,
+      ),
     );
   }
 
   Future<void> cancelNotification() async {
     if (!_initialized) return;
-    await _notifications.cancel(_notificationId);
+    await AwesomeNotifications().cancel(_eventsNotificationId);
   }
 
   // --- Device Notification Methods ---
@@ -199,53 +216,38 @@ class NotificationService {
     final statusLabel = Device.statusLabel(device.status);
     final title = '${device.name} - $statusLabel';
 
-    // Create action buttons for W/L/C
-    // showsUserInterface: true required for callback to work reliably
-    final actions = [
-      AndroidNotificationAction(
-        'status_worn_${device.id}',
-        'W',
-        showsUserInterface: true,
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: notificationId,
+        channelKey: _deviceChannelKey,
+        title: title,
+        locked: true, // Makes it ongoing/persistent
+        autoDismissible: false,
       ),
-      AndroidNotificationAction(
-        'status_loose_${device.id}',
-        'L',
-        showsUserInterface: true,
-      ),
-      AndroidNotificationAction(
-        'status_charging_${device.id}',
-        'C',
-        showsUserInterface: true,
-      ),
-    ];
-
-    final androidDetails = AndroidNotificationDetails(
-      _deviceChannelId,
-      _deviceChannelName,
-      channelDescription: 'Persistent notifications for device status with quick toggle buttons',
-      importance: Importance.low,
-      priority: Priority.low,
-      ongoing: true,
-      autoCancel: false,
-      playSound: false,
-      enableVibration: false,
-      actions: actions,
-    );
-
-    final details = NotificationDetails(android: androidDetails);
-
-    await _notifications.show(
-      notificationId,
-      title,
-      null,
-      details,
+      actionButtons: [
+        NotificationActionButton(
+          key: 'status_worn_${device.id}',
+          label: 'W',
+          actionType: ActionType.SilentAction, // Execute in background without opening app
+        ),
+        NotificationActionButton(
+          key: 'status_loose_${device.id}',
+          label: 'L',
+          actionType: ActionType.SilentAction,
+        ),
+        NotificationActionButton(
+          key: 'status_charging_${device.id}',
+          label: 'C',
+          actionType: ActionType.SilentAction,
+        ),
+      ],
     );
   }
 
   /// Cancel the notification for a specific device.
   Future<void> cancelDeviceNotification(String deviceId) async {
     if (!_initialized) return;
-    await _notifications.cancel(_deviceNotificationId(deviceId));
+    await AwesomeNotifications().cancel(_deviceNotificationId(deviceId));
   }
 
   /// Update notifications for all powered-on devices.
@@ -271,57 +273,5 @@ class NotificationService {
     for (final device in devices) {
       await cancelDeviceNotification(device.id);
     }
-  }
-
-  // --- Notification Action Processing ---
-
-  /// Process a notification action response (W/L/C button tap).
-  Future<void> _processNotificationAction(NotificationResponse response) async {
-    final actionId = response.actionId;
-    if (actionId == null || actionId.isEmpty) return;
-
-    // Parse action ID format: status_worn_{deviceId}, status_loose_{deviceId}, status_charging_{deviceId}
-    if (!actionId.startsWith('status_')) return;
-
-    final parts = actionId.split('_');
-    if (parts.length < 3) return;
-
-    final statusStr = parts[1];
-    final deviceId = parts.sublist(2).join('_'); // Handle device IDs with underscores
-
-    DeviceStatus? newStatus;
-    switch (statusStr) {
-      case 'worn':
-        newStatus = DeviceStatus.worn;
-      case 'loose':
-        newStatus = DeviceStatus.loose;
-      case 'charging':
-        newStatus = DeviceStatus.charging;
-      default:
-        return;
-    }
-
-    // Check if tracking is enabled - ignore actions when paused
-    final isTracking = await TrackingService.instance.isTracking();
-    if (!isTracking) return;
-
-    // Load the device
-    final devices = await DeviceStore.instance.getDevices();
-    final device = devices.where((d) => d.id == deviceId).firstOrNull;
-    if (device == null) return;
-
-    // Skip if status is unchanged
-    if (device.status == newStatus) return;
-
-    // Update the device status
-    final updatedDevice = device.copyWith(status: newStatus);
-    await DeviceStore.instance.updateDevice(updatedDevice);
-    await LogService.instance.logDeviceUpdated(device, updatedDevice);
-
-    // Update the notification to reflect new status
-    await updateDeviceNotification(updatedDevice);
-
-    // Emit event for UI refresh
-    _deviceStatusChangedController.add(deviceId);
   }
 }
