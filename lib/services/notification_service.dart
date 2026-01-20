@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:awesome_notifications/awesome_notifications.dart';
+import 'package:flutter/material.dart';
 import '../models/device.dart';
 import '../models/event.dart';
 import 'device_store.dart';
@@ -228,16 +229,19 @@ class NotificationService {
         NotificationActionButton(
           key: 'status_worn_${device.id}',
           label: 'W',
+          color: Colors.orange,
           actionType: ActionType.SilentAction, // Execute in background without opening app
         ),
         NotificationActionButton(
           key: 'status_loose_${device.id}',
           label: 'L',
+          color: Colors.grey,
           actionType: ActionType.SilentAction,
         ),
         NotificationActionButton(
           key: 'status_charging_${device.id}',
           label: 'C',
+          color: Colors.green,
           actionType: ActionType.SilentAction,
         ),
       ],
