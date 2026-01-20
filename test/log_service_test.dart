@@ -120,7 +120,7 @@ void main() {
       for (final logLine in logLines) {
         final fields = logLine.split('\t');
         final timestamp = fields[0];
-        
+
         // Verify timestamp can be parsed as DateTime
         expect(() => DateTime.parse(timestamp), returnsNormally);
 
@@ -148,7 +148,6 @@ void main() {
   });
 
   group('LogService device update with effective time', () {
-  group('LogService time window formatting', () {
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       LogService.resetForTesting();
@@ -209,7 +208,23 @@ void main() {
       final effectiveTime = DateTime.utc(2024, 1, 15, 9, 0);
 
       await service.logDeviceUpdated(oldDevice, newDevice, effectiveTime: effectiveTime);
-  
+
+      final logLines = await service.getLogLines();
+      final logLine = logLines.first;
+
+      // Verify format: status change comes before effective time
+      final statusIndex = logLine.indexOf('status=loose');
+      final effectiveIndex = logLine.indexOf('effective=');
+      expect(statusIndex, lessThan(effectiveIndex));
+    });
+  });
+
+  group('LogService time window formatting', () {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      LogService.resetForTesting();
+    });
+
     test('logEventStarted with same earliest/latest outputs single timestamp', () async {
       final service = LogService.instance;
       final time = DateTime.utc(2024, 1, 15, 10, 30);
@@ -340,11 +355,6 @@ void main() {
 
       final logLines = await service.getLogLines();
       final logLine = logLines.first;
-
-      // Verify format: status change comes before effective time
-      final statusIndex = logLine.indexOf('status=loose');
-      final effectiveIndex = logLine.indexOf('effective=');
-      expect(statusIndex, lessThan(effectiveIndex));
 
       // Tabs and newlines should be replaced with spaces
       expect(logLine, contains('Note with tab and newline'));
