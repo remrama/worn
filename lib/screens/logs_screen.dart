@@ -25,6 +25,8 @@ class _LogsScreenState extends State<LogsScreen> {
   bool _loading = true;
   bool _isTracking = true;
   Timer? _durationTimer;
+  StreamSubscription<String>? _statusSubscription;
+  StreamSubscription<EventNotificationAction>? _eventActionSubscription;
 
   @override
   void initState() {
@@ -33,12 +35,50 @@ class _LogsScreenState extends State<LogsScreen> {
     _durationTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
+    _statusSubscription = NotificationService.instance.onDeviceStatusChanged.listen(
+      (_) => _load(),
+      onError: (Object error) {
+        debugPrint('Error in onDeviceStatusChanged stream: $error');
+      },
+    );
+    _eventActionSubscription = NotificationService.instance.onEventAction.listen(
+      _handleEventAction,
+      onError: (Object error) {
+        debugPrint('Error in onEventAction stream: $error');
+      },
+    );
   }
 
   @override
   void dispose() {
     _durationTimer?.cancel();
+    _statusSubscription?.cancel();
+    _eventActionSubscription?.cancel();
     super.dispose();
+  }
+
+  /// Handle event actions from notification buttons (Note/Stop/Cancel).
+  void _handleEventAction(EventNotificationAction action) {
+    if (!mounted) return;
+
+    // Find the event by ID
+    final event = _events.where((e) => e.id == action.eventId).firstOrNull;
+    if (event == null) {
+      _load(); // Refresh in case events changed
+      return;
+    }
+
+    // Trigger the appropriate dialog
+    switch (action.action) {
+      case 'note':
+        _addEventNote(event);
+      case 'stop':
+        _stopEvent(event);
+      case 'cancel':
+        _cancelEvent(event);
+      default:
+        debugPrint('Unknown event action: ${action.action}');
+    }
   }
 
   Future<void> _load() async {
@@ -51,8 +91,16 @@ class _LogsScreenState extends State<LogsScreen> {
       _isTracking = isTracking;
       _loading = false;
     });
-    // Update notification to reflect current events with freshly calculated durations
-    await NotificationService.instance.updateNotification(events);
+    // Update notifications only when tracking is active
+    // Check mounted to avoid unnecessary work after widget disposal
+    if (!mounted) return;
+    if (isTracking) {
+      await NotificationService.instance.updateAllEventNotifications(events);
+      await NotificationService.instance.updateAllDeviceNotifications(devices);
+    } else {
+      await NotificationService.instance.cancelAllEventNotifications(events);
+      await NotificationService.instance.cancelAllDeviceNotifications(devices);
+    }
   }
 
   Future<void> _toggleTracking() async {
@@ -76,8 +124,12 @@ class _LogsScreenState extends State<LogsScreen> {
     await TrackingService.instance.setTracking(newValue);
     if (newValue) {
       await LogService.instance.logTrackingResumed();
+      // Restore device notifications when tracking resumes
+      await NotificationService.instance.updateAllDeviceNotifications(_devices);
     } else {
       await LogService.instance.logTrackingPaused();
+      // Cancel device notifications when tracking is paused
+      await NotificationService.instance.cancelAllDeviceNotifications(_devices);
     }
     setState(() {
       _isTracking = newValue;
@@ -94,6 +146,9 @@ class _LogsScreenState extends State<LogsScreen> {
       try {
         await DeviceStore.instance.addDevice(result.device!);
         await LogService.instance.logDeviceAdded(result.device!);
+        if (result.device!.isPoweredOn) {
+          await NotificationService.instance.updateDeviceNotification(result.device!);
+        }
         _load();
       } catch (e) {
         if (e.toString().contains('Device name must be unique')) {
@@ -115,6 +170,7 @@ class _LogsScreenState extends State<LogsScreen> {
     if (result.deleteRequested) {
       await DeviceStore.instance.deleteDevice(device.id);
       await LogService.instance.logDeviceDeleted(device);
+      await NotificationService.instance.cancelDeviceNotification(device.id);
       _load();
       return;
     }
@@ -123,6 +179,12 @@ class _LogsScreenState extends State<LogsScreen> {
       try {
         await DeviceStore.instance.updateDevice(result.device!);
         await LogService.instance.logDeviceUpdated(device, result.device!);
+        // Update or cancel notification based on power state
+        if (result.device!.isPoweredOn) {
+          await NotificationService.instance.updateDeviceNotification(result.device!);
+        } else {
+          await NotificationService.instance.cancelDeviceNotification(result.device!.id);
+        }
         _load();
       } catch (e) {
         if (e.toString().contains('Device name must be unique')) {
@@ -173,6 +235,7 @@ class _LogsScreenState extends State<LogsScreen> {
     final updated = device.copyWith(status: newStatus);
     await DeviceStore.instance.updateDevice(updated);
     await LogService.instance.logDeviceUpdated(device, updated);
+    await NotificationService.instance.updateDeviceNotification(updated);
     _load();
   }
 
@@ -233,6 +296,7 @@ class _LogsScreenState extends State<LogsScreen> {
         result.stopEarliest,
         result.stopLatest,
       );
+      await NotificationService.instance.cancelEventNotification(event.id);
       _load();
     }
   }
@@ -252,6 +316,7 @@ class _LogsScreenState extends State<LogsScreen> {
     if (confirm == true) {
       await EventStore.instance.stopEvent(event.id);
       await LogService.instance.logEventCancelled(event);
+      await NotificationService.instance.cancelEventNotification(event.id);
       _load();
     }
   }
@@ -453,14 +518,14 @@ class _LogsScreenState extends State<LogsScreen> {
                       tooltip: 'Add note',
                     ),
                     IconButton(
-                      icon: const Icon(Icons.cancel, color: Colors.orange),
-                      onPressed: () => _cancelEvent(e),
-                      tooltip: 'Cancel',
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.stop, color: Colors.red),
+                      icon: const Icon(Icons.stop, color: Colors.orange),
                       onPressed: () => _stopEvent(e),
                       tooltip: 'Stop',
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.cancel, color: Colors.red),
+                      onPressed: () => _cancelEvent(e),
+                      tooltip: 'Cancel',
                     ),
                   ],
                 ),
