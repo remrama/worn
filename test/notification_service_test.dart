@@ -324,49 +324,6 @@ void main() {
       expect(title, 'MyWatch - Worn');
     });
 
-    test('notification body shows location when worn', () {
-      final device = Device(
-        name: 'MyWatch',
-        deviceType: DeviceType.watch,
-        status: DeviceStatus.worn,
-        location: DeviceLocation.leftWrist,
-      );
-
-      final body = device.status == DeviceStatus.worn
-          ? Device.locationLabel(device.location)
-          : '';
-
-      expect(body, 'Left Wrist');
-    });
-
-    test('notification body is empty when loose', () {
-      final device = Device(
-        name: 'MyWatch',
-        deviceType: DeviceType.watch,
-        status: DeviceStatus.loose,
-      );
-
-      final body = device.status == DeviceStatus.worn
-          ? Device.locationLabel(device.location)
-          : '';
-
-      expect(body, '');
-    });
-
-    test('notification body is empty when charging', () {
-      final device = Device(
-        name: 'MyWatch',
-        deviceType: DeviceType.watch,
-        status: DeviceStatus.charging,
-      );
-
-      final body = device.status == DeviceStatus.worn
-          ? Device.locationLabel(device.location)
-          : '';
-
-      expect(body, '');
-    });
-
     test('powered off device should not show notification', () {
       final device = Device(
         name: 'MyWatch',

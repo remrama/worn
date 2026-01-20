@@ -58,8 +58,12 @@ class _LogsScreenState extends State<LogsScreen> {
     });
     // Update notification to reflect current events with freshly calculated durations
     await NotificationService.instance.updateNotification(events);
-    // Update device notifications for all powered-on devices
-    await NotificationService.instance.updateAllDeviceNotifications(devices);
+    // Update device notifications only when tracking is active
+    if (isTracking) {
+      await NotificationService.instance.updateAllDeviceNotifications(devices);
+    } else {
+      await NotificationService.instance.cancelAllDeviceNotifications(devices);
+    }
   }
 
   Future<void> _toggleTracking() async {
@@ -83,8 +87,12 @@ class _LogsScreenState extends State<LogsScreen> {
     await TrackingService.instance.setTracking(newValue);
     if (newValue) {
       await LogService.instance.logTrackingResumed();
+      // Restore device notifications when tracking resumes
+      await NotificationService.instance.updateAllDeviceNotifications(_devices);
     } else {
       await LogService.instance.logTrackingPaused();
+      // Cancel device notifications when tracking is paused
+      await NotificationService.instance.cancelAllDeviceNotifications(_devices);
     }
     setState(() {
       _isTracking = newValue;

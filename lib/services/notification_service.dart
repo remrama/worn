@@ -199,27 +199,23 @@ class NotificationService {
     final statusLabel = Device.statusLabel(device.status);
     final title = '${device.name} - $statusLabel';
 
-    // Show location when worn, empty otherwise
-    final body = device.status == DeviceStatus.worn
-        ? Device.locationLabel(device.location)
-        : '';
-
     // Create action buttons for W/L/C
+    // showsUserInterface: true required for callback to work reliably
     final actions = [
       AndroidNotificationAction(
         'status_worn_${device.id}',
         'W',
-        showsUserInterface: false,
+        showsUserInterface: true,
       ),
       AndroidNotificationAction(
         'status_loose_${device.id}',
         'L',
-        showsUserInterface: false,
+        showsUserInterface: true,
       ),
       AndroidNotificationAction(
         'status_charging_${device.id}',
         'C',
-        showsUserInterface: false,
+        showsUserInterface: true,
       ),
     ];
 
@@ -241,7 +237,7 @@ class NotificationService {
     await _notifications.show(
       notificationId,
       title,
-      body,
+      null,
       details,
     );
   }
@@ -266,6 +262,14 @@ class NotificationService {
       } else {
         await cancelDeviceNotification(device.id);
       }
+    }
+  }
+
+  /// Cancel notifications for all devices in the list.
+  Future<void> cancelAllDeviceNotifications(List<Device> devices) async {
+    if (!_initialized) return;
+    for (final device in devices) {
+      await cancelDeviceNotification(device.id);
     }
   }
 
