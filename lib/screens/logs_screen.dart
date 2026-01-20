@@ -25,6 +25,7 @@ class _LogsScreenState extends State<LogsScreen> {
   bool _loading = true;
   bool _isTracking = true;
   Timer? _durationTimer;
+  StreamSubscription<String>? _statusSubscription;
 
   @override
   void initState() {
@@ -33,11 +34,15 @@ class _LogsScreenState extends State<LogsScreen> {
     _durationTimer = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
+    _statusSubscription = NotificationService.instance.onDeviceStatusChanged.listen((_) {
+      _load();
+    });
   }
 
   @override
   void dispose() {
     _durationTimer?.cancel();
+    _statusSubscription?.cancel();
     super.dispose();
   }
 
@@ -53,6 +58,8 @@ class _LogsScreenState extends State<LogsScreen> {
     });
     // Update notification to reflect current events with freshly calculated durations
     await NotificationService.instance.updateNotification(events);
+    // Update device notifications for all powered-on devices
+    await NotificationService.instance.updateAllDeviceNotifications(devices);
   }
 
   Future<void> _toggleTracking() async {
@@ -94,6 +101,9 @@ class _LogsScreenState extends State<LogsScreen> {
       try {
         await DeviceStore.instance.addDevice(result.device!);
         await LogService.instance.logDeviceAdded(result.device!);
+        if (result.device!.isPoweredOn) {
+          await NotificationService.instance.updateDeviceNotification(result.device!);
+        }
         _load();
       } catch (e) {
         if (e.toString().contains('Device name must be unique')) {
@@ -115,6 +125,7 @@ class _LogsScreenState extends State<LogsScreen> {
     if (result.deleteRequested) {
       await DeviceStore.instance.deleteDevice(device.id);
       await LogService.instance.logDeviceDeleted(device);
+      await NotificationService.instance.cancelDeviceNotification(device.id);
       _load();
       return;
     }
@@ -123,6 +134,12 @@ class _LogsScreenState extends State<LogsScreen> {
       try {
         await DeviceStore.instance.updateDevice(result.device!);
         await LogService.instance.logDeviceUpdated(device, result.device!);
+        // Update or cancel notification based on power state
+        if (result.device!.isPoweredOn) {
+          await NotificationService.instance.updateDeviceNotification(result.device!);
+        } else {
+          await NotificationService.instance.cancelDeviceNotification(result.device!.id);
+        }
         _load();
       } catch (e) {
         if (e.toString().contains('Device name must be unique')) {
@@ -173,6 +190,7 @@ class _LogsScreenState extends State<LogsScreen> {
     final updated = device.copyWith(status: newStatus);
     await DeviceStore.instance.updateDevice(updated);
     await LogService.instance.logDeviceUpdated(device, updated);
+    await NotificationService.instance.updateDeviceNotification(updated);
     _load();
   }
 
