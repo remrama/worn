@@ -34,7 +34,19 @@ class LogService {
     await _prefs!.setString(_key, _logLines.join('\n'));
   }
 
-  String _timestamp() => DateTime.now().toUtc().toIso8601String();
+  /// Formats a DateTime as ISO 8601 with timezone offset (e.g., 2024-01-15T10:30:00.000-05:00)
+  String _formatDateTime(DateTime dt) {
+    final local = dt.toLocal();
+    final offset = local.timeZoneOffset;
+    final sign = offset.isNegative ? '-' : '+';
+    final hours = offset.inHours.abs().toString().padLeft(2, '0');
+    final minutes = (offset.inMinutes.abs() % 60).toString().padLeft(2, '0');
+    // Dart's toIso8601String on local time omits timezone, so we append it
+    final isoBase = local.toIso8601String();
+    return '$isoBase$sign$hours:$minutes';
+  }
+
+  String _timestamp() => _formatDateTime(DateTime.now());
 
   Future<void> _append(String line) async {
     await _ensureLoaded();
@@ -98,9 +110,9 @@ class LogService {
 
   String _formatTimeWindow(DateTime earliest, DateTime latest) {
     if (earliest == latest) {
-      return earliest.toIso8601String();
+      return _formatDateTime(earliest);
     }
-    return 'earliest=${earliest.toIso8601String()}\tlatest=${latest.toIso8601String()}';
+    return 'earliest=${_formatDateTime(earliest)}\tlatest=${_formatDateTime(latest)}';
   }
 
   Future<void> logEventStarted(Event event) async {

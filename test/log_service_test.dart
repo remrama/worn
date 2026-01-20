@@ -121,9 +121,9 @@ void main() {
         
         // Verify timestamp can be parsed as DateTime
         expect(() => DateTime.parse(timestamp), returnsNormally);
-        
-        // Verify it's in UTC format
-        expect(timestamp, contains('Z'));
+
+        // Verify it includes timezone offset (e.g., +00:00 or -05:00)
+        expect(timestamp, matches(RegExp(r'[+-]\d{2}:\d{2}$')));
       }
     });
 
