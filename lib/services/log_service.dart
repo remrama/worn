@@ -88,11 +88,11 @@ class LogService {
   Future<void> logNote(String note, {Device? device, Event? event}) async {
     final sanitized = note.replaceAll('\t', ' ').replaceAll('\n', ' ');
     if (device != null) {
-      await _append('${_timestamp()}\tNOTE\t${device.id}\t${device.name}\t$sanitized');
+      await _append('${_timestamp()}\tDEVICE_NOTE\t${device.id}\t${device.name}\t$sanitized');
     } else if (event != null) {
-      await _append('${_timestamp()}\tNOTE\t${event.id}\t${event.displayName}\t$sanitized');
+      await _append('${_timestamp()}\tACTIVITY_NOTE\t${event.id}\t${event.displayName}\t$sanitized');
     } else {
-      await _append('${_timestamp()}\tNOTE\t$sanitized');
+      await _append('${_timestamp()}\tGLOBAL_NOTE\t$sanitized');
     }
   }
 
@@ -100,7 +100,7 @@ class LogService {
     if (earliest == latest) {
       return earliest.toIso8601String();
     }
-    return '${earliest.toIso8601String()}..${latest.toIso8601String()}';
+    return 'earliest=${earliest.toIso8601String()}\tlatest=${latest.toIso8601String()}';
   }
 
   Future<void> logEventStarted(Event event) async {
@@ -123,9 +123,8 @@ class LogService {
   }
 
   Future<void> logEventCancelled(Event event) async {
-    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest);
     await _append(
-      '${_timestamp()}\tEVENT_CANCELLED\t${event.id}\t${event.type.name}\t$startWindow',
+      '${_timestamp()}\tEVENT_CANCELLED\t${event.id}\t${event.type.name}',
     );
   }
 

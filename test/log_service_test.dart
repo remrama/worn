@@ -30,27 +30,11 @@ void main() {
       expect(logLine, contains('EVENT_CANCELLED'));
       expect(logLine, contains('test-event-id'));
       expect(logLine, contains('inBed'));
-      expect(logLine, contains('2024-01-15T22:00:00.000Z'));
+      // Cancelled events no longer include start window
+      expect(logLine, isNot(contains('2024-01-15T22:00:00.000Z')));
     });
 
-    test('logEventCancelled with time window includes both times', () async {
-      final service = LogService.instance;
-      final event = Event(
-        id: 'test-event-id-2',
-        type: EventType.walk,
-        startEarliest: DateTime.utc(2024, 1, 15, 10, 0),
-        startLatest: DateTime.utc(2024, 1, 15, 10, 30),
-      );
-
-      await service.logEventCancelled(event);
-
-      final logLines = await service.getLogLines();
-      final logLine = logLines.last;
-      expect(logLine, contains('EVENT_CANCELLED'));
-      expect(logLine, contains('2024-01-15T10:00:00.000Z..2024-01-15T10:30:00.000Z'));
-    });
-
-    test('logEventCancelled does not include stop time', () async {
+    test('logEventCancelled does not include start window or stop time', () async {
       final service = LogService.instance;
       final event = Event(
         type: EventType.workout,
@@ -62,16 +46,16 @@ void main() {
 
       final logLines = await service.getLogLines();
       final logLine = logLines.last;
-      
+
       // Verify it's a cancellation
       expect(logLine, contains('EVENT_CANCELLED'));
 
-      // Count tab-separated fields - should have 5 fields for cancelled events
-      // (timestamp, event_type, id, type, startWindow)
+      // Count tab-separated fields - should have 4 fields for cancelled events
+      // (timestamp, EVENT_CANCELLED, id, type)
       final fields = logLine.split('\t');
-      expect(fields.length, 5);
+      expect(fields.length, 4);
 
-      // Verify no stop window (EVENT_STOPPED would have 6 fields)
+      // Verify no stop window
       expect(logLine, isNot(contains('STOPPED')));
     });
   });
