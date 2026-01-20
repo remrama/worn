@@ -62,7 +62,11 @@ class LogService {
     );
   }
 
-  Future<void> logDeviceUpdated(Device oldDevice, Device newDevice) async {
+  Future<void> logDeviceUpdated(
+    Device oldDevice,
+    Device newDevice, {
+    DateTime? effectiveTime,
+  }) async {
     final changes = <String>[];
 
     if (oldDevice.name != newDevice.name) {
@@ -85,6 +89,11 @@ class LogService {
     }
 
     if (changes.isEmpty) return;
+
+    // Add effective timestamp if backdated
+    if (effectiveTime != null) {
+      changes.add('effective=${effectiveTime.toUtc().toIso8601String()}');
+    }
 
     await _append(
       '${_timestamp()}\tDEVICE_UPDATED\t${newDevice.id}\t"${oldDevice.name}"\t${changes.join('\t')}',

@@ -115,6 +115,7 @@ Uses `SharedPreferences` with these keys:
   - `DeviceLocation` (body-specific locations filtered by device type)
   - `EventType` (watchTv/inBed/lightsOut/walk/run/workout/swim/other)
 - **Time Windows**: Events support earliest/latest timestamps for retroactive logging uncertainty
+- **Backdating**: Long-press on W/L/C status buttons shows preset times (15m, 30m, 1h, 2h ago) or custom time picker for retroactive status changes
 - **Validation**: DeviceStore throws exceptions for duplicate device names
 - **Persistent Notifications**: Silent, ongoing notifications display active events and durations (auto-updated when events start/stop)
 - **Tracking State**: Defaults to paused on first launch; device config editable when paused

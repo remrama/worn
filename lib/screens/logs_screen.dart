@@ -226,7 +226,11 @@ class _LogsScreenState extends State<LogsScreen> {
     }
   }
 
-  Future<void> _changeStatus(Device device, DeviceStatus newStatus) async {
+  Future<void> _changeStatus(
+    Device device,
+    DeviceStatus newStatus, {
+    DateTime? effectiveTime,
+  }) async {
     if (!_isTracking) {
       _showTrackingPausedWarning();
       return;
@@ -234,9 +238,30 @@ class _LogsScreenState extends State<LogsScreen> {
     if (newStatus == device.status) return;
     final updated = device.copyWith(status: newStatus);
     await DeviceStore.instance.updateDevice(updated);
-    await LogService.instance.logDeviceUpdated(device, updated);
+    await LogService.instance.logDeviceUpdated(
+      device,
+      updated,
+      effectiveTime: effectiveTime,
+    );
     await NotificationService.instance.updateDeviceNotification(updated);
     _load();
+  }
+
+  Future<void> _showBackdateStatusSheet(Device device, DeviceStatus newStatus) async {
+    if (!_isTracking) {
+      _showTrackingPausedWarning();
+      return;
+    }
+
+    final now = DateTime.now();
+    final result = await showModalBottomSheet<DateTime?>(
+      context: context,
+      builder: (ctx) => _BackdateBottomSheet(now: now),
+    );
+
+    if (result != null && mounted) {
+      await _changeStatus(device, newStatus, effectiveTime: result);
+    }
   }
 
   Future<void> _addDeviceNote(Device device) async {
@@ -380,28 +405,39 @@ class _LogsScreenState extends State<LogsScreen> {
   }
 
   Widget _statusToggle(Device d) {
-    return ToggleButtons(
-      isSelected: [
-        d.status == DeviceStatus.worn,
-        d.status == DeviceStatus.loose,
-        d.status == DeviceStatus.charging,
-      ],
-      onPressed: (index) {
-        final status = DeviceStatus.values[index];
-        _changeStatus(d, status);
-      },
-      constraints: const BoxConstraints(minWidth: 32, minHeight: 28),
-      borderRadius: BorderRadius.circular(4),
-      selectedColor: Colors.white,
-      fillColor: d.status == DeviceStatus.worn
-          ? Colors.orange
-          : d.status == DeviceStatus.charging
-              ? Colors.green
-              : Colors.grey,
-      children: const [
-        Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('W', style: TextStyle(fontSize: 12))),
-        Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('L', style: TextStyle(fontSize: 12))),
-        Padding(padding: EdgeInsets.symmetric(horizontal: 6), child: Text('C', style: TextStyle(fontSize: 12))),
+    Widget buildButton(DeviceStatus status, String label, Color activeColor) {
+      final isSelected = d.status == status;
+      return GestureDetector(
+        onTap: () => _changeStatus(d, status),
+        onLongPress: () => _showBackdateStatusSheet(d, status),
+        child: Container(
+          constraints: const BoxConstraints(minWidth: 32, minHeight: 28),
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          decoration: BoxDecoration(
+            color: isSelected ? activeColor : null,
+            border: Border.all(color: activeColor.withValues(alpha: 0.5)),
+            borderRadius: BorderRadius.circular(4),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              color: isSelected ? Colors.white : null,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        buildButton(DeviceStatus.worn, 'W', Colors.orange),
+        const SizedBox(width: 2),
+        buildButton(DeviceStatus.loose, 'L', Colors.grey),
+        const SizedBox(width: 2),
+        buildButton(DeviceStatus.charging, 'C', Colors.green),
       ],
     );
   }
@@ -1400,6 +1436,118 @@ class _StopEventDialogState extends State<StopEventDialog> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         TextButton(onPressed: _submit, child: const Text('Stop')),
       ],
+    );
+  }
+}
+
+class _BackdateBottomSheet extends StatefulWidget {
+  final DateTime now;
+  const _BackdateBottomSheet({required this.now});
+
+  @override
+  State<_BackdateBottomSheet> createState() => _BackdateBottomSheetState();
+}
+
+class _BackdateBottomSheetState extends State<_BackdateBottomSheet> {
+  String _formatTimeAgo(Duration d) {
+    if (d.inMinutes < 60) {
+      return '${d.inMinutes}m ago';
+    }
+    final hours = d.inHours;
+    final minutes = d.inMinutes % 60;
+    if (minutes == 0) {
+      return '${hours}h ago';
+    }
+    return '${hours}h ${minutes}m ago';
+  }
+
+  Future<void> _pickCustomTime() async {
+    final date = await showDatePicker(
+      context: context,
+      initialDate: widget.now,
+      firstDate: widget.now.subtract(const Duration(days: 7)),
+      lastDate: widget.now,
+    );
+    if (date == null || !mounted) return;
+
+    final time = await showTimePicker(
+      context: context,
+      initialTime: TimeOfDay.fromDateTime(widget.now),
+    );
+    if (time == null || !mounted) return;
+
+    final combined = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+
+    // Validate not in future
+    if (combined.isAfter(widget.now)) {
+      await showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: const Text('Invalid Time'),
+          content: const Text('Effective time cannot be in the future.'),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+          ],
+        ),
+      );
+      return;
+    }
+
+    if (mounted) {
+      Navigator.pop(context, combined);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final presets = [
+      const Duration(minutes: 15),
+      const Duration(minutes: 30),
+      const Duration(hours: 1),
+      const Duration(hours: 2),
+    ];
+
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Text(
+              'When did this happen?',
+              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                for (final preset in presets)
+                  ActionChip(
+                    label: Text(_formatTimeAgo(preset)),
+                    onPressed: () {
+                      Navigator.pop(context, widget.now.subtract(preset));
+                    },
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: _pickCustomTime,
+              icon: const Icon(Icons.access_time),
+              label: const Text('Custom time...'),
+            ),
+            const SizedBox(height: 8),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
