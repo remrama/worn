@@ -7,15 +7,35 @@ import 'device_store.dart';
 import 'log_service.dart';
 import 'tracking_service.dart';
 
+/// Represents an action taken on an event notification.
+class EventNotificationAction {
+  final String eventId;
+  final String action; // 'note', 'stop', or 'cancel'
+
+  EventNotificationAction(this.eventId, this.action);
+}
+
 /// Top-level callback for notification actions - must be top-level for background execution.
 @pragma('vm:entry-point')
 Future<void> _onNotificationActionReceived(ReceivedAction receivedAction) async {
   final actionKey = receivedAction.buttonKeyPressed;
   if (actionKey.isEmpty) return;
 
-  // Parse action key format: status_worn_{deviceId}, status_loose_{deviceId}, status_charging_{deviceId}
-  if (!actionKey.startsWith('status_')) return;
+  // Handle device status actions (silent, background)
+  if (actionKey.startsWith('status_')) {
+    await _handleDeviceStatusAction(actionKey);
+    return;
+  }
 
+  // Handle event actions (opens app, emits to stream for UI to handle)
+  if (actionKey.startsWith('event_')) {
+    await _handleEventAction(actionKey);
+    return;
+  }
+}
+
+/// Handle device status change from notification action (W/L/C buttons).
+Future<void> _handleDeviceStatusAction(String actionKey) async {
   final parts = actionKey.split('_');
   if (parts.length < 3) return;
 
@@ -58,10 +78,21 @@ Future<void> _onNotificationActionReceived(ReceivedAction receivedAction) async 
   NotificationService.instance._emitDeviceStatusChanged(deviceId);
 }
 
+/// Handle event action from notification (Note/Stop/Cancel buttons).
+Future<void> _handleEventAction(String actionKey) async {
+  final parts = actionKey.split('_');
+  if (parts.length < 3) return;
+
+  final action = parts[1]; // 'note', 'stop', or 'cancel'
+  final eventId = parts.sublist(2).join('_'); // Handle event IDs with underscores
+
+  // Emit event for UI to handle (show appropriate dialog)
+  NotificationService.instance._emitEventAction(EventNotificationAction(eventId, action));
+}
+
 class NotificationService {
   static const _eventsChannelKey = 'active_events';
   static const _eventsChannelName = 'Active Events';
-  static const _eventsNotificationId = 1;
 
   static const _deviceChannelKey = 'device_status';
   static const _deviceChannelName = 'Device Status';
@@ -73,8 +104,14 @@ class NotificationService {
   /// Stream controller for notifying UI of device status changes from notification actions.
   final _deviceStatusChangedController = StreamController<String>.broadcast();
 
+  /// Stream controller for notifying UI of event actions from notification buttons.
+  final _eventActionController = StreamController<EventNotificationAction>.broadcast();
+
   /// Stream that emits device IDs when their status is changed via notification action.
   Stream<String> get onDeviceStatusChanged => _deviceStatusChangedController.stream;
+
+  /// Stream that emits event actions when notification buttons are pressed.
+  Stream<EventNotificationAction> get onEventAction => _eventActionController.stream;
 
   NotificationService._();
 
@@ -92,6 +129,11 @@ class NotificationService {
   /// Internal method to emit device status changed event (called from top-level callback)
   void _emitDeviceStatusChanged(String deviceId) {
     _deviceStatusChangedController.add(deviceId);
+  }
+
+  /// Internal method to emit event action (called from top-level callback)
+  void _emitEventAction(EventNotificationAction action) {
+    _eventActionController.add(action);
   }
 
   Future<void> initialize() async {
@@ -149,6 +191,95 @@ class NotificationService {
     }
   }
 
+  // --- Event Notification Methods ---
+
+  /// Generate a unique notification ID for an event based on its UUID.
+  /// IDs start at 2000 to avoid conflicts with device notifications (1000+).
+  int _eventNotificationId(String eventId) {
+    return 2000 + eventId.hashCode.abs() % 100000;
+  }
+
+  /// Show or update a notification for an event with Note/Stop/Cancel action buttons.
+  Future<void> updateEventNotification(Event event) async {
+    if (!_initialized) {
+      await initialize();
+      if (!_initialized) return;
+    }
+
+    final notificationId = _eventNotificationId(event.id);
+
+    // Calculate duration
+    final now = DateTime.now().toUtc();
+    final duration = now.difference(event.startEarliest);
+    final hours = duration.inHours;
+    final minutes = duration.inMinutes % 60;
+    final durationStr = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
+
+    final title = event.displayName;
+    final body = 'Duration: $durationStr';
+
+    await AwesomeNotifications().createNotification(
+      content: NotificationContent(
+        id: notificationId,
+        channelKey: _eventsChannelKey,
+        title: title,
+        body: body,
+        locked: true, // Makes it ongoing/persistent
+        autoDismissible: false,
+      ),
+      actionButtons: [
+        NotificationActionButton(
+          key: 'event_note_${event.id}',
+          label: 'Note',
+          autoDismissible: false, // Keep notification visible
+          actionType: ActionType.Default, // Opens app to show note dialog
+        ),
+        NotificationActionButton(
+          key: 'event_stop_${event.id}',
+          label: 'Stop',
+          color: Colors.orange,
+          autoDismissible: false, // Keep notification until actually stopped
+          actionType: ActionType.Default, // Opens app to show stop dialog
+        ),
+        NotificationActionButton(
+          key: 'event_cancel_${event.id}',
+          label: 'Cancel',
+          color: Colors.red,
+          autoDismissible: false, // Keep notification until actually cancelled
+          actionType: ActionType.Default, // Opens app to show cancel confirmation
+        ),
+      ],
+    );
+  }
+
+  /// Cancel the notification for a specific event.
+  Future<void> cancelEventNotification(String eventId) async {
+    if (!_initialized) return;
+    await AwesomeNotifications().cancel(_eventNotificationId(eventId));
+  }
+
+  /// Update notifications for all active events.
+  Future<void> updateAllEventNotifications(List<Event> events) async {
+    if (!_initialized) {
+      await initialize();
+      if (!_initialized) return;
+    }
+
+    for (final event in events) {
+      await updateEventNotification(event);
+    }
+  }
+
+  /// Cancel notifications for all events in the list.
+  Future<void> cancelAllEventNotifications(List<Event> events) async {
+    if (!_initialized) return;
+    for (final event in events) {
+      await cancelEventNotification(event.id);
+    }
+  }
+
+  // --- Legacy method for backward compatibility (now calls updateAllEventNotifications) ---
+
   Future<void> updateNotification(List<Event> activeEvents) async {
     if (!_initialized) {
       await initialize();
@@ -160,35 +291,14 @@ class NotificationService {
       return;
     }
 
-    final count = activeEvents.length;
-    final title = count == 1 ? '1 active event' : '$count active events';
-
-    // Calculate current time once for all events
-    final now = DateTime.now().toUtc();
-    final lines = activeEvents.map((e) {
-      final duration = now.difference(e.startEarliest);
-      final hours = duration.inHours;
-      final minutes = duration.inMinutes % 60;
-      final durationStr = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
-      return '${e.displayName} ($durationStr)';
-    }).toList();
-
-    await AwesomeNotifications().createNotification(
-      content: NotificationContent(
-        id: _eventsNotificationId,
-        channelKey: _eventsChannelKey,
-        title: title,
-        body: lines.join('\n'),
-        notificationLayout: NotificationLayout.BigText,
-        locked: true, // Makes it ongoing/persistent
-        autoDismissible: false,
-      ),
-    );
+    // Update individual notifications for each event
+    await updateAllEventNotifications(activeEvents);
   }
 
   Future<void> cancelNotification() async {
     if (!_initialized) return;
-    await AwesomeNotifications().cancel(_eventsNotificationId);
+    // Cancel all active notifications - this is a no-op now since we manage individual events
+    // The caller should use cancelAllEventNotifications instead
   }
 
   // --- Device Notification Methods ---
