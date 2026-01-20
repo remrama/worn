@@ -115,6 +115,7 @@ Uses `SharedPreferences` with these keys:
   - `DeviceLocation` (body-specific locations filtered by device type)
   - `EventType` (watchTv/inBed/lightsOut/walk/run/workout/swim/other)
 - **Time Windows**: Events support earliest/latest timestamps for retroactive logging uncertainty
+- **Backdating**: Long-press on W/L/C status buttons shows preset times (15m, 30m, 1h, 2h ago) or custom time picker for retroactive status changes
 - **Validation**: DeviceStore throws exceptions for duplicate device names
 - **Persistent Notifications**: Silent, ongoing notifications display active events and durations (auto-updated when events start/stop)
 - **Tracking State**: Defaults to paused on first launch; device config editable when paused
@@ -128,6 +129,7 @@ Tab-separated entries with UTC ISO 8601 timestamps. Time windows use `..` separa
 2024-01-15T10:30:00.000Z	DEVICE_ADDED	uuid	name="MyWatch"	type=watch	status=loose	location=leftWrist	sn=SN123	power=on
 2024-01-15T10:32:00.000Z	DEVICE_UPDATED	uuid	"MyWatch"	name="My Watch Renamed"	type=wristband	sn=SN456	status=worn	location=rightWrist	power=off
 2024-01-15T10:45:00.000Z	DEVICE_UPDATED	uuid	"My Watch Renamed"	status=loose
+2024-01-15T10:50:00.000Z	DEVICE_UPDATED	uuid	"My Watch Renamed"	status=worn	effective=2024-01-15T10:35:00.000Z
 2024-01-15T11:00:00.000Z	EVENT_STARTED	uuid	walk	2024-01-15T11:00:00.000Z
 2024-01-15T11:30:00.000Z	EVENT_STOPPED	uuid	walk	2024-01-15T11:00:00.000Z	2024-01-15T11:25:00.000Z..2024-01-15T11:30:00.000Z
 2024-01-15T12:00:00.000Z	NOTE	User added a custom note
