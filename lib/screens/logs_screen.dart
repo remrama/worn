@@ -1358,8 +1358,6 @@ class _BackdateBottomSheet extends StatefulWidget {
 }
 
 class _BackdateBottomSheetState extends State<_BackdateBottomSheet> {
-  DateTime? _customTime;
-
   String _formatTimeAgo(Duration d) {
     if (d.inMinutes < 60) {
       return '${d.inMinutes}m ago';

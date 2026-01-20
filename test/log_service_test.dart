@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:worn/models/device.dart';
 import 'package:worn/models/event.dart';
 import 'package:worn/services/log_service.dart';
 
@@ -158,6 +159,78 @@ void main() {
       expect(logLines[1], contains('GLOBAL_TRACKING\ton'));
       expect(logLines[2], contains('GLOBAL_TRACKING\toff'));
       expect(logLines[3], contains('GLOBAL_TRACKING\ton'));
+    });
+  });
+
+  group('LogService device update with effective time', () {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      LogService.resetForTesting();
+    });
+
+    test('logDeviceUpdated without effectiveTime does not include effective field', () async {
+      final service = LogService.instance;
+      final oldDevice = Device(
+        id: 'device-123',
+        name: 'MyWatch',
+        deviceType: DeviceType.watch,
+        status: DeviceStatus.loose,
+      );
+      final newDevice = oldDevice.copyWith(status: DeviceStatus.worn);
+
+      await service.logDeviceUpdated(oldDevice, newDevice);
+
+      final logLines = await service.getLogLines();
+      expect(logLines.length, 1);
+
+      final logLine = logLines.first;
+      expect(logLine, contains('DEVICE_UPDATED'));
+      expect(logLine, contains('status=worn'));
+      expect(logLine, isNot(contains('effective=')));
+    });
+
+    test('logDeviceUpdated with effectiveTime includes effective field', () async {
+      final service = LogService.instance;
+      final oldDevice = Device(
+        id: 'device-456',
+        name: 'MyRing',
+        deviceType: DeviceType.ring,
+        status: DeviceStatus.charging,
+      );
+      final newDevice = oldDevice.copyWith(status: DeviceStatus.worn);
+      final effectiveTime = DateTime.utc(2024, 1, 15, 10, 30);
+
+      await service.logDeviceUpdated(oldDevice, newDevice, effectiveTime: effectiveTime);
+
+      final logLines = await service.getLogLines();
+      expect(logLines.length, 1);
+
+      final logLine = logLines.first;
+      expect(logLine, contains('DEVICE_UPDATED'));
+      expect(logLine, contains('status=worn'));
+      expect(logLine, contains('effective=2024-01-15T10:30:00.000Z'));
+    });
+
+    test('logDeviceUpdated effective field appears after status change', () async {
+      final service = LogService.instance;
+      final oldDevice = Device(
+        id: 'device-789',
+        name: 'MyBand',
+        deviceType: DeviceType.wristband,
+        status: DeviceStatus.worn,
+      );
+      final newDevice = oldDevice.copyWith(status: DeviceStatus.loose);
+      final effectiveTime = DateTime.utc(2024, 1, 15, 9, 0);
+
+      await service.logDeviceUpdated(oldDevice, newDevice, effectiveTime: effectiveTime);
+
+      final logLines = await service.getLogLines();
+      final logLine = logLines.first;
+
+      // Verify format: status change comes before effective time
+      final statusIndex = logLine.indexOf('status=loose');
+      final effectiveIndex = logLine.indexOf('effective=');
+      expect(statusIndex, lessThan(effectiveIndex));
     });
   });
 }
