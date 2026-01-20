@@ -1311,7 +1311,7 @@ class _StopEventDialogState extends State<StopEventDialog> {
 
     // Start must be before stop: event's latest start <= stop earliest
     if (widget.event.startLatest.isAfter(stopEarliest)) {
-      return 'Stop earliest time cannot be before the event start time.';
+      return 'Stop earliest time cannot be before the event\'s latest possible start time.';
     }
 
     return null;
