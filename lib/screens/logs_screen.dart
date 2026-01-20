@@ -1008,8 +1008,63 @@ class _AddEventDialogState extends State<AddEventDialog> {
     return DateTime(date.year, date.month, date.day, time.hour, time.minute).toUtc();
   }
 
+  String? _validateTimes() {
+    final now = DateTime.now().toUtc();
+    final startEarliest = _combineDateTime(_startEarliestDate, _startEarliestTime);
+    final startLatest = _combineDateTime(_startLatestDate, _startLatestTime);
+
+    // No future start times
+    if (startEarliest.isAfter(now)) {
+      return 'Start earliest time cannot be in the future.';
+    }
+    if (startLatest.isAfter(now)) {
+      return 'Start latest time cannot be in the future.';
+    }
+
+    // Start window: earliest must not be after latest
+    if (startEarliest.isAfter(startLatest)) {
+      return 'Start earliest time cannot be after start latest time.';
+    }
+
+    if (_includeStop) {
+      final stopEarliest = _combineDateTime(_stopEarliestDate, _stopEarliestTime);
+      final stopLatest = _combineDateTime(_stopLatestDate, _stopLatestTime);
+
+      // Stop window: earliest must not be after latest
+      if (stopEarliest.isAfter(stopLatest)) {
+        return 'Stop earliest time cannot be after stop latest time.';
+      }
+
+      // Start must be before stop: latest start <= earliest stop
+      if (startLatest.isAfter(stopEarliest)) {
+        return 'Start latest time cannot be after stop earliest time.';
+      }
+    }
+
+    return null;
+  }
+
+  Future<void> _showValidationError(String message) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Invalid Time'),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
   void _submit() {
     if (_selectedType == null) return;
+
+    final validationError = _validateTimes();
+    if (validationError != null) {
+      _showValidationError(validationError);
+      return;
+    }
 
     final event = Event(
       type: _selectedType!,
@@ -1245,7 +1300,43 @@ class _StopEventDialogState extends State<StopEventDialog> {
     return DateTime(date.year, date.month, date.day, time.hour, time.minute).toUtc();
   }
 
+  String? _validateTimes() {
+    final stopEarliest = _combineDateTime(_earliestDate, _earliestTime);
+    final stopLatest = _combineDateTime(_latestDate, _latestTime);
+
+    // Stop window: earliest must not be after latest
+    if (stopEarliest.isAfter(stopLatest)) {
+      return 'Stop earliest time cannot be after stop latest time.';
+    }
+
+    // Start must be before stop: event's latest start <= stop earliest
+    if (widget.event.startLatest.isAfter(stopEarliest)) {
+      return 'Stop earliest time cannot be before the event\'s latest possible start time.';
+    }
+
+    return null;
+  }
+
+  Future<void> _showValidationError(String message) async {
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Invalid Time'),
+        content: Text(message),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('OK')),
+        ],
+      ),
+    );
+  }
+
   void _submit() {
+    final validationError = _validateTimes();
+    if (validationError != null) {
+      _showValidationError(validationError);
+      return;
+    }
+
     final earliest = _combineDateTime(_earliestDate, _earliestTime);
     final latest = _combineDateTime(_latestDate, _latestTime);
     Navigator.pop(context, StopEventResult(stopEarliest: earliest, stopLatest: latest));
