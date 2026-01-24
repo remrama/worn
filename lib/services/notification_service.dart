@@ -17,7 +17,8 @@ class EventNotificationAction {
 
 /// Top-level callback for notification actions - must be top-level for background execution.
 @pragma('vm:entry-point')
-Future<void> _onNotificationActionReceived(ReceivedAction receivedAction) async {
+Future<void> _onNotificationActionReceived(
+    ReceivedAction receivedAction) async {
   try {
     final actionKey = receivedAction.buttonKeyPressed;
     if (actionKey.isEmpty) return;
@@ -44,7 +45,8 @@ Future<void> _handleDeviceStatusAction(String actionKey) async {
   if (parts.length < 3) return;
 
   final statusStr = parts[1];
-  final deviceId = parts.sublist(2).join('_'); // Handle device IDs with underscores
+  final deviceId =
+      parts.sublist(2).join('_'); // Handle device IDs with underscores
 
   DeviceStatus? newStatus;
   switch (statusStr) {
@@ -88,10 +90,12 @@ Future<void> _handleEventAction(String actionKey) async {
   if (parts.length < 3) return;
 
   final action = parts[1]; // 'note', 'stop', or 'cancel'
-  final eventId = parts.sublist(2).join('_'); // Handle event IDs with underscores
+  final eventId =
+      parts.sublist(2).join('_'); // Handle event IDs with underscores
 
   // Emit event for UI to handle (show appropriate dialog)
-  NotificationService.instance._emitEventAction(EventNotificationAction(eventId, action));
+  NotificationService.instance
+      ._emitEventAction(EventNotificationAction(eventId, action));
 }
 
 class NotificationService {
@@ -109,13 +113,16 @@ class NotificationService {
   final _deviceStatusChangedController = StreamController<String>.broadcast();
 
   /// Stream controller for notifying UI of event actions from notification buttons.
-  final _eventActionController = StreamController<EventNotificationAction>.broadcast();
+  final _eventActionController =
+      StreamController<EventNotificationAction>.broadcast();
 
   /// Stream that emits device IDs when their status is changed via notification action.
-  Stream<String> get onDeviceStatusChanged => _deviceStatusChangedController.stream;
+  Stream<String> get onDeviceStatusChanged =>
+      _deviceStatusChangedController.stream;
 
   /// Stream that emits event actions when notification buttons are pressed.
-  Stream<EventNotificationAction> get onEventAction => _eventActionController.stream;
+  Stream<EventNotificationAction> get onEventAction =>
+      _eventActionController.stream;
 
   NotificationService._();
 
@@ -163,7 +170,8 @@ class NotificationService {
           NotificationChannel(
             channelKey: _deviceChannelKey,
             channelName: _deviceChannelName,
-            channelDescription: 'Persistent notifications for device status with quick toggle buttons',
+            channelDescription:
+                'Persistent notifications for device status with quick toggle buttons',
             importance: NotificationImportance.Low,
             playSound: false,
             enableVibration: false,
@@ -250,7 +258,8 @@ class NotificationService {
           label: 'Cancel',
           color: Colors.red,
           autoDismissible: false, // Keep notification until actually cancelled
-          actionType: ActionType.Default, // Opens app to show cancel confirmation
+          actionType:
+              ActionType.Default, // Opens app to show cancel confirmation
         ),
       ],
     );
@@ -302,7 +311,8 @@ class NotificationService {
   Future<void> cancelNotification() async {
     if (!_initialized) return;
     // Cancel all event notifications on this channel
-    await AwesomeNotifications().cancelNotificationsByChannelKey(_eventsChannelKey);
+    await AwesomeNotifications()
+        .cancelNotificationsByChannelKey(_eventsChannelKey);
   }
 
   // --- Device Notification Methods ---
@@ -344,7 +354,8 @@ class NotificationService {
           key: 'status_worn_${device.id}',
           label: 'W',
           color: Colors.orange,
-          actionType: ActionType.SilentAction, // Execute in background without opening app
+          actionType: ActionType
+              .SilentAction, // Execute in background without opening app
         ),
         NotificationActionButton(
           key: 'status_loose_${device.id}',

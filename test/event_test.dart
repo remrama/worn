@@ -3,7 +3,8 @@ import 'package:worn/models/event.dart';
 
 void main() {
   group('Event model', () {
-    test('creates with required fields and auto-generates id and startTime', () {
+    test('creates with required fields and auto-generates id and startTime',
+        () {
       final event = Event(type: EventType.walk);
 
       expect(event.type, EventType.walk);

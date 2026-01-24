@@ -11,7 +11,8 @@ void main() {
       TrackingService.resetForTesting();
     });
 
-    test('initializes with default value false when no persisted state', () async {
+    test('initializes with default value false when no persisted state',
+        () async {
       final service = TrackingService.instance;
       final isTracking = await service.isTracking();
       expect(isTracking, false);
@@ -37,13 +38,13 @@ void main() {
       final service1 = TrackingService.instance;
       await service1.setTracking(false);
       expect(await service1.isTracking(), false);
-      
+
       // Reset singleton to simulate app restart
       TrackingService.resetForTesting();
-      
+
       // Mock the persisted value
       SharedPreferences.setMockInitialValues({'worn_tracking': false});
-      
+
       // New instance should retrieve the persisted value
       final service2 = TrackingService.instance;
       expect(await service2.isTracking(), false);
@@ -60,10 +61,10 @@ void main() {
 
     test('setTracking updates internal state immediately', () async {
       final service = TrackingService.instance;
-      
+
       await service.setTracking(false);
       expect(await service.isTracking(), false);
-      
+
       await service.setTracking(true);
       expect(await service.isTracking(), true);
     });

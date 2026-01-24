@@ -17,7 +17,7 @@ void main() {
     test('singleton instance returns same instance', () {
       final instance1 = NotificationService.instance;
       final instance2 = NotificationService.instance;
-      
+
       expect(instance1, same(instance2));
     });
 
@@ -25,13 +25,14 @@ void main() {
       final instance1 = NotificationService.instance;
       NotificationService.resetForTesting();
       final instance2 = NotificationService.instance;
-      
+
       expect(instance1, isNot(same(instance2)));
     });
 
-    test('updateNotification with empty list completes without error', () async {
+    test('updateNotification with empty list completes without error',
+        () async {
       final service = NotificationService.instance;
-      
+
       // This should not throw even if initialization fails
       // When not initialized and empty list provided, it returns early gracefully
       await expectLater(
@@ -44,7 +45,7 @@ void main() {
       // Create an event that started 30 minutes ago
       final now = DateTime.now().toUtc();
       final thirtyMinutesAgo = now.subtract(const Duration(minutes: 30));
-      
+
       final event = Event(
         type: EventType.walk,
         startEarliest: thirtyMinutesAgo,
@@ -56,7 +57,7 @@ void main() {
       final hours = duration.inHours;
       final minutes = duration.inMinutes % 60;
       final durationStr = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
-      
+
       expect(durationStr, matches(RegExp(r'^\d+m$')));
       expect(durationStr, isNot(contains('h')));
     });
@@ -65,7 +66,7 @@ void main() {
       // Create an event that started 90 minutes ago
       final now = DateTime.now().toUtc();
       final ninetyMinutesAgo = now.subtract(const Duration(minutes: 90));
-      
+
       final event = Event(
         type: EventType.workout,
         startEarliest: ninetyMinutesAgo,
@@ -77,7 +78,7 @@ void main() {
       final hours = duration.inHours;
       final minutes = duration.inMinutes % 60;
       final durationStr = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
-      
+
       expect(durationStr, matches(RegExp(r'^\d+h \d+m$')));
       expect(durationStr, contains('h'));
       expect(durationStr, contains('m'));
@@ -87,10 +88,10 @@ void main() {
       final events = [
         Event(type: EventType.walk),
       ];
-      
+
       final count = events.length;
       final title = count == 1 ? '1 active event' : '$count active events';
-      
+
       expect(title, '1 active event');
     });
 
@@ -99,17 +100,17 @@ void main() {
         Event(type: EventType.walk),
         Event(type: EventType.workout),
       ];
-      
+
       final count = events.length;
       final title = count == 1 ? '1 active event' : '$count active events';
-      
+
       expect(title, '2 active events');
     });
 
     test('notification content includes event display names', () {
       final now = DateTime.now().toUtc();
       final tenMinutesAgo = now.subtract(const Duration(minutes: 10));
-      
+
       final events = [
         Event(
           type: EventType.walk,
@@ -131,7 +132,7 @@ void main() {
         final durationStr = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
         return '${e.displayName} ($durationStr)';
       }).toList();
-      
+
       expect(lines.length, 2);
       expect(lines[0], contains('Walk'));
       expect(lines[1], contains('Workout'));
@@ -142,7 +143,7 @@ void main() {
     test('notification content with custom event name', () {
       final now = DateTime.now().toUtc();
       final fiveMinutesAgo = now.subtract(const Duration(minutes: 5));
-      
+
       final event = Event(
         type: EventType.other,
         customName: 'Meditation',
@@ -156,7 +157,7 @@ void main() {
       final minutes = duration.inMinutes % 60;
       final durationStr = hours > 0 ? '${hours}h ${minutes}m' : '${minutes}m';
       final line = '${event.displayName} ($durationStr)';
-      
+
       expect(line, contains('Meditation'));
       expect(line, isNot(contains('Other')));
     });

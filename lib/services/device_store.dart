@@ -22,7 +22,8 @@ class DeviceStore {
     if (json != null) {
       final list = jsonDecode(json) as List;
       _devices.clear();
-      _devices.addAll(list.map((e) => Device.fromMap(e as Map<String, dynamic>)));
+      _devices
+          .addAll(list.map((e) => Device.fromMap(e as Map<String, dynamic>)));
     }
   }
 

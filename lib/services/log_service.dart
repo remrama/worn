@@ -109,9 +109,11 @@ class LogService {
   Future<void> logNote(String note, {Device? device, Event? event}) async {
     final sanitized = note.replaceAll('\t', ' ').replaceAll('\n', ' ');
     if (device != null) {
-      await _append('${_timestamp()}\tDEVICE_NOTE\t${device.id}\t${device.name}\t$sanitized');
+      await _append(
+          '${_timestamp()}\tDEVICE_NOTE\t${device.id}\t${device.name}\t$sanitized');
     } else if (event != null) {
-      await _append('${_timestamp()}\tACTIVITY_NOTE\t${event.id}\t${event.displayName}\t$sanitized');
+      await _append(
+          '${_timestamp()}\tACTIVITY_NOTE\t${event.id}\t${event.displayName}\t$sanitized');
     } else {
       await _append('${_timestamp()}\tGLOBAL_NOTE\t$sanitized');
     }
@@ -121,7 +123,8 @@ class LogService {
   /// - Returns null if earliest == latest AND within 60 seconds of logTime (use log timestamp)
   /// - Returns single timestamp if earliest == latest but backdated
   /// - Returns 'earliest=...\tlatest=...' if there's a window
-  String? _formatTimeWindow(DateTime earliest, DateTime latest, DateTime logTime) {
+  String? _formatTimeWindow(
+      DateTime earliest, DateTime latest, DateTime logTime) {
     if (earliest == latest) {
       // Check if it's close to "now" (within 60 seconds of log time)
       final diff = logTime.difference(earliest).abs();
@@ -137,7 +140,8 @@ class LogService {
 
   Future<void> logEventStarted(Event event) async {
     final now = DateTime.now();
-    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest, now);
+    final startWindow =
+        _formatTimeWindow(event.startEarliest, event.startLatest, now);
     final parts = [
       _formatDateTime(now),
       'EVENT_STARTED',
@@ -156,7 +160,8 @@ class LogService {
     DateTime stopLatest,
   ) async {
     final now = DateTime.now();
-    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest, now);
+    final startWindow =
+        _formatTimeWindow(event.startEarliest, event.startLatest, now);
     final stopWindow = _formatTimeWindow(stopEarliest, stopLatest, now);
     final parts = [
       _formatDateTime(now),
@@ -185,7 +190,8 @@ class LogService {
     DateTime stopLatest,
   ) async {
     final now = DateTime.now();
-    final startWindow = _formatTimeWindow(event.startEarliest, event.startLatest, now);
+    final startWindow =
+        _formatTimeWindow(event.startEarliest, event.startLatest, now);
     final stopWindow = _formatTimeWindow(stopEarliest, stopLatest, now);
     final parts = [
       _formatDateTime(now),

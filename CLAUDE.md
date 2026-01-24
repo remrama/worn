@@ -27,7 +27,9 @@ Minimalist, borderline brutalist. The tiny, technical audience means UI prioriti
 - Track device status (worn, loose, charging) with quick 3-way toggle on device list
 - Track device body location (set in device edit menu, only relevant when worn)
 - Track device power state (on/off)
-- Start/stop events with optional time windows for retroactive logging
+- Add tracked event types (like devices), then Start/Stop with one tap
+- Long-press Start/Stop for backdated times with optional uncertainty windows
+- Long-press event row to log retroactive events (start + stop in one dialog)
 - Export tab-separated logs for external analysis
 - Persistent notifications to prevent forgetting active events
 
@@ -72,6 +74,8 @@ dart run flutter_launcher_icons
   - Device model includes DeviceStatus enum (worn, loose, charging) for quick status toggle
   - Device model includes DeviceLocation enum for body placement (filtered by device type)
   - Device model includes isPoweredOn boolean (defaults to true for backward compatibility)
+  - EventTemplate model represents tracked event types (persistent list of events user wants to track)
+  - Event model represents active/running events with start time windows
 - **Services** (`lib/services/`): Singleton instances for business logic and persistence
 - **Screens** (`lib/screens/`): Stateful widgets using setState for state management
 
@@ -84,13 +88,15 @@ lib/
 ├── main.dart              # App entry point & 2-tab navigation (Logs, History)
 ├── models/
 │   ├── device.dart        # Device model with DeviceType, DeviceStatus & DeviceLocation enums
-│   └── event.dart         # Event model with EventType enum and time windows
+│   ├── event.dart         # Event model with EventType enum and time windows
+│   └── event_template.dart  # EventTemplate model for tracked event types
 ├── screens/
 │   ├── logs_screen.dart   # Unified device & event management UI with type icons
 │   └── history_screen.dart  # Log viewing, export, and data wipe
 ├── services/
 │   ├── device_store.dart  # Device persistence (singleton)
 │   ├── event_store.dart   # Active event persistence (singleton)
+│   ├── event_template_store.dart  # Event template persistence (singleton)
 │   ├── log_service.dart   # Event logging (singleton)
 │   ├── notification_service.dart  # Persistent notification for active events (singleton)
 │   └── tracking_service.dart  # Tracking state persistence (singleton, defaults to paused)
@@ -101,13 +107,14 @@ lib/
 
 Uses `SharedPreferences` with these keys:
 - `worn_devices`: JSON-encoded list of device maps
-- `worn_events`: JSON-encoded list of active event maps
+- `worn_active_events`: JSON-encoded list of active event maps
+- `worn_event_templates`: JSON-encoded list of tracked event type templates
 - `worn_log`: Newline-separated tab-delimited log entries
 - `worn_tracking`: Boolean tracking state (true = tracking, false = paused, defaults to false)
 
 ## Key Patterns
 
-- **Singletons**: Access services via `DeviceStore.instance`, `EventStore.instance`, `LogService.instance`, `NotificationService.instance` and `TrackingService.instance`
+- **Singletons**: Access services via `DeviceStore.instance`, `EventStore.instance`, `EventTemplateStore.instance`, `LogService.instance`, `NotificationService.instance` and `TrackingService.instance`
 - **Immutability**: Device and Event models use copyWith for updates
 - **Enums**:
   - `DeviceType` (watch, ring, wristband, armband, chestStrap, headband, other) with icons
@@ -115,7 +122,8 @@ Uses `SharedPreferences` with these keys:
   - `DeviceLocation` (body-specific locations filtered by device type)
   - `EventType` (inBed/lightsOut/walk/run/workout/swim/watchTv/other)
 - **Time Windows**: Events support earliest/latest timestamps for retroactive logging uncertainty
-- **Backdating**: Long-press on W/L/C status buttons shows preset times (15m, 30m, 1h, 2h ago) or custom time picker for retroactive status changes
+- **Event Templates**: Users maintain a persistent list of event types they want to track (like devices). Each template shows Start/Stop toggle button. Tap for instant action, long-press for windowed time picker. Long-press row (when not running) for retroactive event logging.
+- **Backdating**: Long-press on W/L/C status buttons or event Start/Stop buttons shows preset times (15m, 30m, 1h, 2h ago) or custom time picker for retroactive changes
 - **Validation**: DeviceStore throws exceptions for duplicate device names
 - **Persistent Notifications**: Silent, ongoing notifications display active events and durations (auto-updated when events start/stop)
 - **Tracking State**: Defaults to paused on first launch; device config editable when paused
@@ -152,4 +160,5 @@ Uses internal variable names for parsing efficiency:
 
 - Unit tests in `test/device_test.dart` for Device model
 - Unit tests in `test/event_test.dart` for Event model
+- Unit tests in `test/event_template_test.dart` for EventTemplate model
 - Widget tests in `test/widget_test.dart` for navigation UI
