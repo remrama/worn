@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'screens/logs_screen.dart';
 import 'screens/history_screen.dart';
@@ -55,7 +56,7 @@ class _MainScreenState extends State<MainScreen> {
       appBar: AppBar(
         actions: [
           IconButton(
-            icon: const Icon(Icons.code),
+            icon: const FaIcon(FontAwesomeIcons.github),
             onPressed: _openGitHub,
             tooltip: 'GitHub',
           ),
