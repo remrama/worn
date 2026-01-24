@@ -36,7 +36,8 @@ void main() {
       expect(logLine, isNot(contains('latest=')));
     });
 
-    test('logEventCancelled does not include start window or stop time', () async {
+    test('logEventCancelled does not include start window or stop time',
+        () async {
       final service = LogService.instance;
       final event = Event(
         type: EventType.workout,
@@ -153,7 +154,9 @@ void main() {
       LogService.resetForTesting();
     });
 
-    test('logDeviceUpdated without effectiveTime does not include effective field', () async {
+    test(
+        'logDeviceUpdated without effectiveTime does not include effective field',
+        () async {
       final service = LogService.instance;
       final oldDevice = Device(
         id: 'device-123',
@@ -174,7 +177,8 @@ void main() {
       expect(logLine, isNot(contains('effective=')));
     });
 
-    test('logDeviceUpdated with effectiveTime includes effective field', () async {
+    test('logDeviceUpdated with effectiveTime includes effective field',
+        () async {
       final service = LogService.instance;
       final oldDevice = Device(
         id: 'device-456',
@@ -185,7 +189,8 @@ void main() {
       final newDevice = oldDevice.copyWith(status: DeviceStatus.worn);
       final effectiveTime = DateTime.utc(2024, 1, 15, 10, 30);
 
-      await service.logDeviceUpdated(oldDevice, newDevice, effectiveTime: effectiveTime);
+      await service.logDeviceUpdated(oldDevice, newDevice,
+          effectiveTime: effectiveTime);
 
       final logLines = await service.getLogLines();
       expect(logLines.length, 1);
@@ -196,7 +201,8 @@ void main() {
       expect(logLine, contains('effective=2024-01-15T10:30:00.000Z'));
     });
 
-    test('logDeviceUpdated effective field appears after status change', () async {
+    test('logDeviceUpdated effective field appears after status change',
+        () async {
       final service = LogService.instance;
       final oldDevice = Device(
         id: 'device-789',
@@ -207,7 +213,8 @@ void main() {
       final newDevice = oldDevice.copyWith(status: DeviceStatus.loose);
       final effectiveTime = DateTime.utc(2024, 1, 15, 9, 0);
 
-      await service.logDeviceUpdated(oldDevice, newDevice, effectiveTime: effectiveTime);
+      await service.logDeviceUpdated(oldDevice, newDevice,
+          effectiveTime: effectiveTime);
 
       final logLines = await service.getLogLines();
       final logLine = logLines.first;
@@ -225,7 +232,8 @@ void main() {
       LogService.resetForTesting();
     });
 
-    test('logEventStarted with same earliest/latest near now omits timestamp', () async {
+    test('logEventStarted with same earliest/latest near now omits timestamp',
+        () async {
       final service = LogService.instance;
       // Use current time (within 60 seconds tolerance)
       final now = DateTime.now().toUtc();
@@ -248,7 +256,9 @@ void main() {
       expect(logLine, endsWith('walk'));
     });
 
-    test('logEventStarted with same earliest/latest backdated outputs single timestamp', () async {
+    test(
+        'logEventStarted with same earliest/latest backdated outputs single timestamp',
+        () async {
       final service = LogService.instance;
       // Use a backdated time (more than 60 seconds in the past)
       final backdatedTime = DateTime.utc(2024, 1, 15, 10, 30);
@@ -271,10 +281,13 @@ void main() {
       expect(logLine, contains('2024-01-15'));
       // Should have more fields than just timestamp + type (includes backdated time)
       final fields = logLine.split('\t');
-      expect(fields.length, 5); // timestamp, EVENT_STARTED, id, type, backdated_time
+      expect(fields.length,
+          5); // timestamp, EVENT_STARTED, id, type, backdated_time
     });
 
-    test('logEventStarted with different earliest/latest outputs key=value pairs', () async {
+    test(
+        'logEventStarted with different earliest/latest outputs key=value pairs',
+        () async {
       final service = LogService.instance;
       final event = Event(
         id: 'test-id',
@@ -293,7 +306,9 @@ void main() {
       expect(logLine, contains('latest='));
     });
 
-    test('logEventStopped with time window outputs earliest/latest for stop time', () async {
+    test(
+        'logEventStopped with time window outputs earliest/latest for stop time',
+        () async {
       final service = LogService.instance;
       final event = Event(
         id: 'test-id',
@@ -385,7 +400,8 @@ void main() {
 
       // Tabs and newlines should be replaced with spaces
       expect(logLine, contains('Note with tab and newline'));
-      expect(logLine, isNot(contains('\t\t'))); // No double tabs from note content
+      expect(
+          logLine, isNot(contains('\t\t'))); // No double tabs from note content
     });
   });
 }

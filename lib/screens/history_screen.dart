@@ -207,10 +207,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
                     itemCount: _lines.length,
                     itemBuilder: (ctx, i) {
                       return Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 4),
                         child: Text(
                           _lines[i],
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+                          style: const TextStyle(
+                              fontFamily: 'monospace', fontSize: 11),
                         ),
                       );
                     },

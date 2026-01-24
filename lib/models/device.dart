@@ -67,8 +67,8 @@ class Device {
     DeviceLocation? location,
     this.serialNumber,
     this.isPoweredOn = true,
-  }) : id = id ?? const Uuid().v4(),
-       location = location ?? defaultLocationFor(deviceType);
+  })  : id = id ?? const Uuid().v4(),
+        location = location ?? defaultLocationFor(deviceType);
 
   Device copyWith({
     String? name,
