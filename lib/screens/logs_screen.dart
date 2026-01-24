@@ -2351,8 +2351,9 @@ class _AddEventTemplateDialogState extends State<_AddEventTemplateDialog> {
   String? _customName;
 
   bool _isTypeAlreadyAdded(EventType type) {
-    if (type == EventType.other)
+    if (type == EventType.other) {
       return false; // Multiple "other" types allowed with different names
+    }
     return widget.existingTemplates.any((t) => t.type == type);
   }
 
