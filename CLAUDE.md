@@ -124,13 +124,19 @@ Uses `SharedPreferences` with these keys:
 
 ## Log Format
 
-Tab-separated entries with ISO 8601 timestamps including timezone offset (e.g., `-05:00`). When events have time windows (uncertainty), `earliest=` and `latest=` key=value pairs are appended. When there is no time window, the log entry's timestamp IS the event time (no separate timestamp appended). Uses internal variable names for parsing efficiency:
+Tab-separated entries with ISO 8601 timestamps including timezone offset (e.g., `-05:00`). Event times are handled as follows:
+- **Current time** (within 60s of log time): No separate timestamp (log entry timestamp IS the event time)
+- **Backdated precise time**: Single timestamp appended
+- **Time window** (uncertainty): `earliest=` and `latest=` key=value pairs appended
+
+Uses internal variable names for parsing efficiency:
 ```
 2024-01-15T10:30:00.000-05:00	DEVICE_ADDED	uuid	name="MyWatch"	type=watch	status=loose	location=leftWrist	sn=SN123	power=on
 2024-01-15T10:32:00.000-05:00	DEVICE_UPDATED	uuid	"MyWatch"	name="My Watch Renamed"	type=wristband	sn=SN456	status=worn	location=rightWrist	power=off
 2024-01-15T10:45:00.000-05:00	DEVICE_UPDATED	uuid	"My Watch Renamed"	status=loose
 2024-01-15T11:00:00.000-05:00	EVENT_STARTED	uuid	walk
 2024-01-15T11:05:00.000-05:00	EVENT_STARTED	uuid	run	earliest=2024-01-15T11:00:00.000-05:00	latest=2024-01-15T11:05:00.000-05:00
+2024-01-15T11:10:00.000-05:00	EVENT_STARTED	uuid	workout	2024-01-15T10:45:00.000-05:00
 2024-01-15T11:30:00.000-05:00	EVENT_STOPPED	uuid	walk
 2024-01-15T11:35:00.000-05:00	EVENT_STOPPED	uuid	run	earliest=2024-01-15T11:30:00.000-05:00	latest=2024-01-15T11:35:00.000-05:00
 2024-01-15T11:40:00.000-05:00	EVENT_CANCELLED	uuid	swim
