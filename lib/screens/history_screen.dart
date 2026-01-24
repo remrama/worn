@@ -1,8 +1,7 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/file_sharer.dart';
 import '../services/log_service.dart';
 
 class HistoryScreen extends StatefulWidget {
@@ -49,13 +48,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<void> _shareLogAsFile() async {
     try {
       final content = await LogService.instance.getLogContent();
-      final tempDir = await getTemporaryDirectory();
-      final file = File('${tempDir.path}/worn_log.txt');
-      await file.writeAsString(content);
-      await Share.shareXFiles(
-        [XFile(file.path)],
-        subject: 'Worn Log Export',
-      );
+      await shareLogAsFile(content);
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -170,16 +163,17 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   ],
                 ),
               ),
-              const PopupMenuItem(
-                value: 'file',
-                child: Row(
-                  children: [
-                    Icon(Icons.insert_drive_file),
-                    SizedBox(width: 8),
-                    Text('Share as file'),
-                  ],
+              if (isFileShareSupported)
+                const PopupMenuItem(
+                  value: 'file',
+                  child: Row(
+                    children: [
+                      Icon(Icons.insert_drive_file),
+                      SizedBox(width: 8),
+                      Text('Share as file'),
+                    ],
+                  ),
                 ),
-              ),
             ],
           ),
           PopupMenuButton<String>(
