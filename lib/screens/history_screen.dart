@@ -1,4 +1,6 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/log_service.dart';
@@ -28,11 +30,30 @@ class _HistoryScreenState extends State<HistoryScreen> {
     });
   }
 
-  Future<void> _shareLog() async {
+  Future<void> _shareLogAsText() async {
     try {
       final content = await LogService.instance.getLogContent();
       await Share.share(
         content,
+        subject: 'Worn Log Export',
+      );
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to share log: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _shareLogAsFile() async {
+    try {
+      final content = await LogService.instance.getLogContent();
+      final tempDir = await getTemporaryDirectory();
+      final file = File('${tempDir.path}/worn_log.txt');
+      await file.writeAsString(content);
+      await Share.shareXFiles(
+        [XFile(file.path)],
         subject: 'Worn Log Export',
       );
     } catch (e) {
@@ -128,10 +149,38 @@ class _HistoryScreenState extends State<HistoryScreen> {
       appBar: AppBar(
         title: const Text('History'),
         actions: [
-          IconButton(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.share),
             tooltip: 'Share log',
-            onPressed: _shareLog,
+            onSelected: (value) {
+              if (value == 'text') {
+                _shareLogAsText();
+              } else if (value == 'file') {
+                _shareLogAsFile();
+              }
+            },
+            itemBuilder: (ctx) => [
+              const PopupMenuItem(
+                value: 'text',
+                child: Row(
+                  children: [
+                    Icon(Icons.text_fields),
+                    SizedBox(width: 8),
+                    Text('Share as text'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'file',
+                child: Row(
+                  children: [
+                    Icon(Icons.insert_drive_file),
+                    SizedBox(width: 8),
+                    Text('Share as file'),
+                  ],
+                ),
+              ),
+            ],
           ),
           PopupMenuButton<String>(
             onSelected: (value) {
