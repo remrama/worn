@@ -2,7 +2,6 @@
 """Tests for parse_log.py"""
 
 import tempfile
-from datetime import datetime, timezone, timedelta
 
 import pandas as pd
 import pytest
@@ -56,8 +55,12 @@ def test_parse_log_returns_dataframe(sample_log_file):
         "power",
         "event_subtype",
         "effective_time",
-        "earliest",
-        "latest",
+        "start_time",
+        "start_earliest",
+        "start_latest",
+        "stop_time",
+        "stop_earliest",
+        "stop_latest",
         "note",
         "tracking_state",
     ]
@@ -92,15 +95,19 @@ def test_device_updated_with_changes(sample_log_file):
 
 
 def test_device_updated_with_effective_time(sample_log_file):
-    """Test DEVICE_UPDATED with backdated effective time."""
+    """Test DEVICE_UPDATED with backdated effective time (Z suffix)."""
     df = parse_log(sample_log_file)
     rows = df[df["event_type"] == "DEVICE_UPDATED"]
 
-    # Fourth entry has effective time
+    # Fourth entry has effective time with Z suffix
     row = rows.iloc[2]
     assert row["status"] == "worn"
     assert row["effective_time"] is not None
     assert row["effective_time"].year == 2024
+    assert row["effective_time"].month == 1
+    assert row["effective_time"].day == 15
+    assert row["effective_time"].hour == 10
+    assert row["effective_time"].minute == 40
 
 
 def test_event_started_no_window(sample_log_file):
@@ -111,9 +118,9 @@ def test_event_started_no_window(sample_log_file):
 
     assert row["id"] == "uuid-event1"
     assert row["event_subtype"] == "walk"
-    assert pd.isna(row["earliest"])
-    assert pd.isna(row["latest"])
-    assert pd.isna(row["effective_time"])
+    assert pd.isna(row["start_earliest"])
+    assert pd.isna(row["start_latest"])
+    assert pd.isna(row["start_time"])
 
 
 def test_event_started_with_window(sample_log_file):
@@ -124,8 +131,12 @@ def test_event_started_with_window(sample_log_file):
 
     assert row["id"] == "uuid-event2"
     assert row["event_subtype"] == "run"
-    assert row["earliest"] is not None
-    assert row["latest"] is not None
+    assert row["start_earliest"] is not None
+    assert row["start_latest"] is not None
+    assert row["start_earliest"].hour == 11
+    assert row["start_earliest"].minute == 0
+    assert row["start_latest"].hour == 11
+    assert row["start_latest"].minute == 5
 
 
 def test_event_started_backdated(sample_log_file):
@@ -136,7 +147,37 @@ def test_event_started_backdated(sample_log_file):
 
     assert row["id"] == "uuid-event3"
     assert row["event_subtype"] == "workout"
-    assert row["effective_time"] is not None
+    assert row["start_time"] is not None
+    assert row["start_time"].hour == 10
+    assert row["start_time"].minute == 45
+
+
+def test_event_stopped_no_window(sample_log_file):
+    """Test EVENT_STOPPED without time window."""
+    df = parse_log(sample_log_file)
+    rows = df[df["event_type"] == "EVENT_STOPPED"]
+    row = rows.iloc[0]
+
+    assert row["id"] == "uuid-event1"
+    assert row["event_subtype"] == "walk"
+    # No start or stop windows
+    assert pd.isna(row["start_time"])
+    assert pd.isna(row["stop_time"])
+    assert pd.isna(row["start_earliest"])
+    assert pd.isna(row["stop_earliest"])
+
+
+def test_event_stopped_with_stop_window(sample_log_file):
+    """Test EVENT_STOPPED with stop time window."""
+    df = parse_log(sample_log_file)
+    rows = df[df["event_type"] == "EVENT_STOPPED"]
+    row = rows.iloc[1]
+
+    assert row["id"] == "uuid-event2"
+    assert row["event_subtype"] == "run"
+    # This log entry only has a stop window (no start window recorded)
+    assert row["start_earliest"] is not None  # First earliest/latest pair
+    assert row["start_latest"] is not None
 
 
 def test_event_cancelled(sample_log_file):
@@ -177,15 +218,29 @@ def test_activity_note(sample_log_file):
     assert row["note"] == "Event-specific note"
 
 
-def test_event_retroactive(sample_log_file):
-    """Test EVENT_RETROACTIVE parsing."""
+def test_event_retroactive_with_start_and_stop(sample_log_file):
+    """Test EVENT_RETROACTIVE parsing with both start and stop times.
+
+    EVENT_RETROACTIVE can have both a start window and a stop window.
+    The sample log has two bare timestamps: start time and stop time.
+    """
     df = parse_log(sample_log_file)
     row = df[df["event_type"] == "EVENT_RETROACTIVE"].iloc[0]
 
     assert row["id"] == "uuid-event5"
     assert row["event_subtype"] == "inBed"
-    # Retroactive events have start and stop times as effective_time + additional field
-    # Based on the log format, these are single timestamps not windows
+
+    # Start time: 2024-01-14T22:00:00.000-05:00
+    assert row["start_time"] is not None
+    assert row["start_time"].day == 14
+    assert row["start_time"].hour == 22
+    assert row["start_time"].minute == 0
+
+    # Stop time: 2024-01-15T06:00:00.000-05:00
+    assert row["stop_time"] is not None
+    assert row["stop_time"].day == 15
+    assert row["stop_time"].hour == 6
+    assert row["stop_time"].minute == 0
 
 
 def test_global_tracking(sample_log_file):
@@ -240,6 +295,77 @@ def test_serial_number_none():
 
     df = parse_log(filepath)
     assert df.iloc[0]["serial_number"] is None
+
+
+def test_z_suffix_timestamp():
+    """Test parsing timestamps with Z suffix (UTC) for Python <3.11 compatibility."""
+    log_content = '2024-01-15T10:30:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"Watch"\tstatus=worn\teffective=2024-01-15T15:30:00.000Z'
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write(log_content)
+        filepath = f.name
+
+    df = parse_log(filepath)
+    row = df.iloc[0]
+    assert row["effective_time"] is not None
+    assert row["effective_time"].hour == 15
+    assert row["effective_time"].minute == 30
+
+
+def test_event_stopped_with_both_windows():
+    """Test EVENT_STOPPED with both start and stop uncertainty windows."""
+    log_content = (
+        "2024-01-15T12:00:00.000-05:00\tEVENT_STOPPED\tuuid-123\trun\t"
+        "earliest=2024-01-15T10:00:00.000-05:00\tlatest=2024-01-15T10:05:00.000-05:00\t"
+        "earliest=2024-01-15T11:55:00.000-05:00\tlatest=2024-01-15T12:00:00.000-05:00"
+    )
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write(log_content)
+        filepath = f.name
+
+    df = parse_log(filepath)
+    row = df.iloc[0]
+
+    # Start window
+    assert row["start_earliest"].hour == 10
+    assert row["start_earliest"].minute == 0
+    assert row["start_latest"].hour == 10
+    assert row["start_latest"].minute == 5
+
+    # Stop window
+    assert row["stop_earliest"].hour == 11
+    assert row["stop_earliest"].minute == 55
+    assert row["stop_latest"].hour == 12
+    assert row["stop_latest"].minute == 0
+
+
+def test_event_retroactive_with_windows():
+    """Test EVENT_RETROACTIVE with earliest/latest windows for both start and stop."""
+    log_content = (
+        "2024-01-15T12:00:00.000-05:00\tEVENT_RETROACTIVE\tuuid-123\tinBed\t"
+        "earliest=2024-01-14T22:00:00.000-05:00\tlatest=2024-01-14T22:30:00.000-05:00\t"
+        "earliest=2024-01-15T06:00:00.000-05:00\tlatest=2024-01-15T06:30:00.000-05:00"
+    )
+
+    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
+        f.write(log_content)
+        filepath = f.name
+
+    df = parse_log(filepath)
+    row = df.iloc[0]
+
+    # Start window (bedtime uncertainty)
+    assert row["start_earliest"].day == 14
+    assert row["start_earliest"].hour == 22
+    assert row["start_latest"].hour == 22
+    assert row["start_latest"].minute == 30
+
+    # Stop window (wake time uncertainty)
+    assert row["stop_earliest"].day == 15
+    assert row["stop_earliest"].hour == 6
+    assert row["stop_latest"].hour == 6
+    assert row["stop_latest"].minute == 30
 
 
 if __name__ == "__main__":

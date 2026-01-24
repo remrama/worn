@@ -5,17 +5,26 @@ Parse Worn app log files into pandas DataFrames for analysis.
 Usage:
     from parse_log import parse_log
     df = parse_log("path/to/exported_log.txt")
+
+Requires Python 3.9+ for type hints. Compatible with Python <3.11 by
+handling 'Z' suffix in ISO timestamps.
 """
 
 import re
 from datetime import datetime
-from typing import Optional
 
 import pandas as pd
 
 
 def _parse_timestamp(ts_str: str) -> datetime:
-    """Parse ISO 8601 timestamp with timezone offset."""
+    """Parse ISO 8601 timestamp with timezone offset.
+
+    Handles both '+HH:MM' offsets and 'Z' suffix (UTC) for Python <3.11
+    compatibility.
+    """
+    # Python <3.11 doesn't support 'Z' suffix in fromisoformat
+    if ts_str.endswith("Z"):
+        ts_str = ts_str[:-1] + "+00:00"
     return datetime.fromisoformat(ts_str)
 
 
@@ -35,25 +44,88 @@ def _parse_key_value(field: str) -> tuple[str, str]:
     return (key, value)
 
 
-def _parse_time_window(fields: list[str]) -> dict:
+def _parse_single_time_window(fields: list[str]) -> dict:
     """
-    Parse time window from remaining fields after event type.
+    Parse a single time window from fields.
 
-    Returns dict with keys: effective_time, earliest, latest
+    Used for EVENT_STARTED which only has a start window.
+    Returns dict with keys: start_time, start_earliest, start_latest
     """
-    result = {"effective_time": None, "earliest": None, "latest": None}
+    result = {"start_time": None, "start_earliest": None, "start_latest": None}
 
     for field in fields:
         if field.startswith("earliest="):
-            result["earliest"] = _parse_timestamp(field.split("=", 1)[1])
+            result["start_earliest"] = _parse_timestamp(field.split("=", 1)[1])
         elif field.startswith("latest="):
-            result["latest"] = _parse_timestamp(field.split("=", 1)[1])
-        elif field and not field.startswith("effective="):
+            result["start_latest"] = _parse_timestamp(field.split("=", 1)[1])
+        elif field and "=" not in field:
             # Single backdated timestamp (not a key=value pair)
             try:
-                result["effective_time"] = _parse_timestamp(field)
+                result["start_time"] = _parse_timestamp(field)
             except ValueError:
                 pass  # Not a timestamp, skip
+
+    return result
+
+
+def _parse_dual_time_windows(fields: list[str]) -> dict:
+    """
+    Parse start and stop time windows from fields.
+
+    Used for EVENT_STOPPED and EVENT_RETROACTIVE which can have both
+    start and stop windows. The log format emits start window first,
+    then stop window.
+
+    Possible formats:
+    - No windows: []
+    - Start only (backdated): [timestamp]
+    - Start only (window): [earliest=..., latest=...]
+    - Start + stop (backdated): [start_ts, stop_ts]
+    - Start + stop (windows): [earliest=..., latest=..., earliest=..., latest=...]
+    - Mixed: [start_ts, earliest=..., latest=...] or [earliest=..., latest=..., stop_ts]
+
+    Returns dict with keys: start_time, start_earliest, start_latest,
+                           stop_time, stop_earliest, stop_latest
+    """
+    result = {
+        "start_time": None,
+        "start_earliest": None,
+        "start_latest": None,
+        "stop_time": None,
+        "stop_earliest": None,
+        "stop_latest": None,
+    }
+
+    # Track which earliest/latest we've seen to distinguish start vs stop
+    seen_start_window = False
+    bare_timestamps = []
+
+    for field in fields:
+        if field.startswith("earliest="):
+            ts = _parse_timestamp(field.split("=", 1)[1])
+            if not seen_start_window and result["start_earliest"] is None:
+                result["start_earliest"] = ts
+            else:
+                result["stop_earliest"] = ts
+        elif field.startswith("latest="):
+            ts = _parse_timestamp(field.split("=", 1)[1])
+            if not seen_start_window and result["start_latest"] is None:
+                result["start_latest"] = ts
+                seen_start_window = True  # Mark that we've completed a start window
+            else:
+                result["stop_latest"] = ts
+        elif field and "=" not in field:
+            # Bare timestamp - collect them in order
+            try:
+                bare_timestamps.append(_parse_timestamp(field))
+            except ValueError:
+                pass  # Not a timestamp, skip
+
+    # Assign bare timestamps: first is start, second is stop
+    if len(bare_timestamps) >= 1:
+        result["start_time"] = bare_timestamps[0]
+    if len(bare_timestamps) >= 2:
+        result["stop_time"] = bare_timestamps[1]
 
     return result
 
@@ -120,9 +192,13 @@ def parse_log(filepath: str) -> pd.DataFrame:
         - serial_number: For DEVICE_* events
         - power: on/off for DEVICE_* events
         - event_subtype: For EVENT_* (walk, run, inBed, etc.)
-        - effective_time: Backdated time if specified
-        - earliest: Start of uncertainty window
-        - latest: End of uncertainty window
+        - effective_time: Backdated time for DEVICE_UPDATED
+        - start_time: Backdated start time for EVENT_*
+        - start_earliest: Start of start uncertainty window
+        - start_latest: End of start uncertainty window
+        - stop_time: Backdated stop time for EVENT_STOPPED/RETROACTIVE
+        - stop_earliest: Start of stop uncertainty window
+        - stop_latest: End of stop uncertainty window
         - note: For *_NOTE events
         - tracking_state: For GLOBAL_TRACKING (on/off)
     """
@@ -150,8 +226,12 @@ def parse_log(filepath: str) -> pd.DataFrame:
                 "power": None,
                 "event_subtype": None,
                 "effective_time": None,
-                "earliest": None,
-                "latest": None,
+                "start_time": None,
+                "start_earliest": None,
+                "start_latest": None,
+                "stop_time": None,
+                "stop_earliest": None,
+                "stop_latest": None,
                 "note": None,
                 "tracking_state": None,
             }
@@ -186,14 +266,14 @@ def parse_log(filepath: str) -> pd.DataFrame:
             elif event_type == "EVENT_STARTED":
                 row["id"] = fields[2]
                 row["event_subtype"] = fields[3]
-                time_window = _parse_time_window(fields[4:])
+                time_window = _parse_single_time_window(fields[4:])
                 row.update(time_window)
 
             elif event_type == "EVENT_STOPPED":
                 row["id"] = fields[2]
                 row["event_subtype"] = fields[3]
-                time_window = _parse_time_window(fields[4:])
-                row.update(time_window)
+                time_windows = _parse_dual_time_windows(fields[4:])
+                row.update(time_windows)
 
             elif event_type == "EVENT_CANCELLED":
                 row["id"] = fields[2]
@@ -202,8 +282,8 @@ def parse_log(filepath: str) -> pd.DataFrame:
             elif event_type == "EVENT_RETROACTIVE":
                 row["id"] = fields[2]
                 row["event_subtype"] = fields[3]
-                time_window = _parse_time_window(fields[4:])
-                row.update(time_window)
+                time_windows = _parse_dual_time_windows(fields[4:])
+                row.update(time_windows)
 
             elif event_type == "GLOBAL_TRACKING":
                 row["tracking_state"] = fields[2]
