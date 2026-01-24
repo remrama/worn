@@ -9,6 +9,7 @@ class EventTemplateStore {
   static EventTemplateStore? _instance;
   SharedPreferences? _prefs;
   final List<EventTemplate> _templates = [];
+  bool _migrationDone = false;
 
   EventTemplateStore._();
 
@@ -56,7 +57,10 @@ class EventTemplateStore {
   Future<void> removeTemplate(String id) async {
     await _ensureLoaded();
     // Check if there's an active event for this template
-    final template = _templates.firstWhere((t) => t.id == id);
+    final template = _templates.firstWhere(
+      (t) => t.id == id,
+      orElse: () => throw Exception('Template with id $id not found'),
+    );
     final activeEvents = await EventStore.instance.getActiveEvents();
     final isActive = activeEvents.any((e) => template.matchesEvent(e));
     if (isActive) {
@@ -67,8 +71,11 @@ class EventTemplateStore {
   }
 
   /// Migrate existing active events to templates.
-  /// Call this at app startup to ensure templates exist for any active events.
+  /// Only runs once per session to avoid repeated SharedPreferences reads.
   Future<void> migrateFromActiveEvents() async {
+    if (_migrationDone) return;
+    _migrationDone = true;
+
     await _ensureLoaded();
     final activeEvents = await EventStore.instance.getActiveEvents();
     for (final event in activeEvents) {
