@@ -1,13 +1,13 @@
 import 'package:uuid/uuid.dart';
 
 enum EventType {
-  watchTv,
   inBed,
   lightsOut,
   walk,
   run,
   workout,
   swim,
+  watchTv,
   other,
 }
 

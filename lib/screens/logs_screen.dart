@@ -1075,6 +1075,11 @@ class _AddEventDialogState extends State<AddEventDialog> {
       if (startLatest.isAfter(stopEarliest)) {
         return 'Start latest time cannot be after stop earliest time.';
       }
+
+      // Retroactive events must have non-zero duration
+      if (startLatest == stopEarliest) {
+        return 'Start and stop times cannot be the same for retroactive events.';
+      }
     }
 
     return null;

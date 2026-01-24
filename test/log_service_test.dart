@@ -225,14 +225,15 @@ void main() {
       LogService.resetForTesting();
     });
 
-    test('logEventStarted with same earliest/latest outputs single timestamp', () async {
+    test('logEventStarted with same earliest/latest near now omits timestamp', () async {
       final service = LogService.instance;
-      final time = DateTime.utc(2024, 1, 15, 10, 30);
+      // Use current time (within 60 seconds tolerance)
+      final now = DateTime.now().toUtc();
       final event = Event(
         id: 'test-id',
         type: EventType.walk,
-        startEarliest: time,
-        startLatest: time,
+        startEarliest: now,
+        startLatest: now,
       );
 
       await service.logEventStarted(event);
@@ -240,11 +241,37 @@ void main() {
       final logLines = await service.getLogLines();
       final logLine = logLines.first;
 
-      // Should contain single timestamp, not earliest=/latest= format
+      // Should NOT contain any time window - the log timestamp IS the event time
       expect(logLine, isNot(contains('earliest=')));
       expect(logLine, isNot(contains('latest=')));
-      // Should contain the timestamp directly after event type
-      expect(logLine, contains('walk\t'));
+      // Log line should end with the event type (no trailing timestamp)
+      expect(logLine, endsWith('walk'));
+    });
+
+    test('logEventStarted with same earliest/latest backdated outputs single timestamp', () async {
+      final service = LogService.instance;
+      // Use a backdated time (more than 60 seconds in the past)
+      final backdatedTime = DateTime.utc(2024, 1, 15, 10, 30);
+      final event = Event(
+        id: 'test-id',
+        type: EventType.run,
+        startEarliest: backdatedTime,
+        startLatest: backdatedTime,
+      );
+
+      await service.logEventStarted(event);
+
+      final logLines = await service.getLogLines();
+      final logLine = logLines.first;
+
+      // Should NOT contain earliest=/latest= format (not a window)
+      expect(logLine, isNot(contains('earliest=')));
+      expect(logLine, isNot(contains('latest=')));
+      // Should contain a backdated timestamp (2024-01-15, converted to local timezone)
+      expect(logLine, contains('2024-01-15'));
+      // Should have more fields than just timestamp + type (includes backdated time)
+      final fields = logLine.split('\t');
+      expect(fields.length, 5); // timestamp, EVENT_STARTED, id, type, backdated_time
     });
 
     test('logEventStarted with different earliest/latest outputs key=value pairs', () async {
