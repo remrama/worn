@@ -2,13 +2,13 @@
 *.class
 *.log
 *.pyc
+*.swp
+*.local.*
 __pycache__/
 .pytest_cache/
-*.swp
 .DS_Store
 .atom/
 .buildlog/
-.claude/
 .gemini/
 .history
 .svn/
