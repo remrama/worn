@@ -7,7 +7,7 @@ skills:
 ---
 
 ## Documentation `gh pr-review`
-You have a pre-installed `gh pr-review` extension that simplifies working with Pull Requests. Below are the commands for retrieving PR reviews/comments and replying to review comments in a thread, and open and sumbit a review.
+You have a pre-installed `gh pr-review` extension that simplifies working with Pull Requests. Below are the commands for retrieving PR reviews/comments and replying to review comments in a thread, and open and submit a review.
 
 ## Quick PR overview with gh
 View details: `gh pr-review review view <PR number> -R <owner>/<repo>`
@@ -62,7 +62,7 @@ Note: If you want to leave a high-level comment on a PR that isn’t tied to any
    }
    ```
 
-2. **Add inline comments with the pending review ID.** The `review --add-comment`requiers `review-id` identifier `PRR_…`. Use `gh pr-review review --add-comment <PR number> -R <owner>/<repo> ...`. Example:
+2. **Add inline comments with the pending review ID.** The `review --add-comment` requires `review-id` identifier `PRR_…`. Use `gh pr-review review --add-comment <PR number> -R <owner>/<repo> ...`. Example:
 
    ```sh
    gh pr-review review --add-comment 42 -R owner/repo \
