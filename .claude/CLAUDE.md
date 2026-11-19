@@ -100,7 +100,8 @@ lib/
 │   ├── log_service.dart   # Event logging (singleton)
 │   ├── notification_service.dart  # Persistent notification for active events (singleton)
 │   └── tracking_service.dart  # Tracking state persistence (singleton, defaults to paused)
-└── widgets/               # Custom reusable widgets
+└── widgets/
+    └── device_type_icon.dart  # Device type icon, sizes Font Awesome glyphs to match Material
 ```
 
 ## Data Persistence
@@ -162,3 +163,4 @@ Uses internal variable names for parsing efficiency:
 - Unit tests in `test/event_test.dart` for Event model
 - Unit tests in `test/event_template_test.dart` for EventTemplate model
 - Widget tests in `test/widget_test.dart` for navigation UI
+- Widget tests in `test/device_type_icon_test.dart` for device type icon sizing

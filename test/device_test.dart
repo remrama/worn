@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:worn/models/device.dart';
 
 void main() {
@@ -207,12 +208,18 @@ void main() {
 
     test('iconFor returns correct icons for each device type', () {
       expect(Device.iconFor(DeviceType.watch), Icons.watch);
-      expect(Device.iconFor(DeviceType.ring), Icons.circle_outlined);
+      expect(Device.iconFor(DeviceType.ring), FontAwesomeIcons.ring);
       expect(Device.iconFor(DeviceType.wristband), Icons.watch_outlined);
-      expect(Device.iconFor(DeviceType.armband), Icons.sports);
-      expect(Device.iconFor(DeviceType.chestStrap), Icons.favorite);
-      expect(Device.iconFor(DeviceType.headband), Icons.headset);
+      expect(Device.iconFor(DeviceType.armband), FontAwesomeIcons.handFist);
+      expect(
+          Device.iconFor(DeviceType.chestStrap), FontAwesomeIcons.heartPulse);
+      expect(Device.iconFor(DeviceType.headband), FontAwesomeIcons.brain);
       expect(Device.iconFor(DeviceType.other), Icons.devices_other);
+    });
+
+    test('iconFor returns a distinct icon for each device type', () {
+      final icons = DeviceType.values.map(Device.iconFor).toSet();
+      expect(icons.length, DeviceType.values.length);
     });
 
     test('typeLabel returns correct labels for each device type', () {

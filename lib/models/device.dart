@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:uuid/uuid.dart';
 
 enum DeviceType {
@@ -217,20 +218,23 @@ class Device {
     }
   }
 
+  /// Icon for a device type. Mixes Material and Font Awesome glyphs, since
+  /// Material has no ring, arm, or heart-rate icons that read correctly.
+  /// Render with `DeviceTypeIcon` so Font Awesome glyphs are sized to match.
   static IconData iconFor(DeviceType type) {
     switch (type) {
       case DeviceType.watch:
         return Icons.watch;
       case DeviceType.ring:
-        return Icons.circle_outlined;
+        return FontAwesomeIcons.ring;
       case DeviceType.wristband:
         return Icons.watch_outlined;
       case DeviceType.armband:
-        return Icons.sports;
+        return FontAwesomeIcons.handFist;
       case DeviceType.chestStrap:
-        return Icons.favorite;
+        return FontAwesomeIcons.heartPulse;
       case DeviceType.headband:
-        return Icons.headset;
+        return FontAwesomeIcons.brain;
       case DeviceType.other:
         return Icons.devices_other;
     }
