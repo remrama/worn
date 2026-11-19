@@ -63,6 +63,8 @@ dart run flutter_launcher_icons
 - **deploy-web-preview.yml**: Web preview deployments for all PRs to main
 - **release.yml**: Production release pipeline triggered by version tags (v*.*.*)
 
+**Flutter version:** All workflows pin Flutter `3.38.7` (`flutter-version` in each `subosito/flutter-action` step). Bump every workflow together when upgrading. Flutter 3.50 deprecates `package:flutter/material.dart` and makes `IconData` final, which breaks `font_awesome_flutter` 10.x.
+
 **Note:** Icon generation (`dart run flutter_launcher_icons`) is NOT required in CI workflows. The generated icon files are already committed to the repository and used automatically during builds. Only run this command locally when updating the source icon image.
 
 ## Architecture
