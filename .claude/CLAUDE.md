@@ -147,8 +147,8 @@ The README's "Log Format" and "Parsing the Log" sections are the user-facing spe
 
 Uses internal variable names for parsing efficiency:
 ```
-2024-01-15T10:30:00.000-05:00	DEVICE_ADDED	uuid	name="MyWatch"	type=watch	status=loose	location=leftWrist	make="Garmin"	model="Venu 3"	sn=SN123	power=on
-2024-01-15T10:32:00.000-05:00	DEVICE_UPDATED	uuid	"MyWatch"	name="My Watch Renamed"	type=wristband	sn=SN456	status=worn	location=rightWrist	model="Venu 3S"	power=off
+2024-01-15T10:30:00.000-05:00	DEVICE_ADDED	uuid	nickname="MyWatch"	type=watch	status=loose	location=leftWrist	make="Garmin"	model="Venu 3"	sn=SN123	power=on
+2024-01-15T10:32:00.000-05:00	DEVICE_UPDATED	uuid	"MyWatch"	nickname="My Watch Renamed"	type=wristband	sn=SN456	status=worn	location=rightWrist	model="Venu 3S"	power=off
 2024-01-15T10:45:00.000-05:00	DEVICE_UPDATED	uuid	"My Watch Renamed"	status=loose
 2024-01-15T10:50:00.000-05:00	DEVICE_UPDATED	uuid	"My Watch Renamed"	status=worn	effective=2024-01-15T10:40:00.000-05:00
 2024-01-15T11:00:00.000-05:00	EVENT_STARTED	uuid	walk

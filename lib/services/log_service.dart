@@ -60,7 +60,7 @@ class LogService {
     final make = device.make ?? '';
     final model = device.model ?? '';
     await _append(
-      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\tname="${device.name}"\ttype=${device.deviceType.name}\tstatus=${device.status.name}\tlocation=${device.location.name}\tmake="$make"\tmodel="$model"\tsn=$sn\tpower=$power',
+      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\tnickname="${device.name}"\ttype=${device.deviceType.name}\tstatus=${device.status.name}\tlocation=${device.location.name}\tmake="$make"\tmodel="$model"\tsn=$sn\tpower=$power',
     );
   }
 
@@ -72,7 +72,7 @@ class LogService {
     final changes = <String>[];
 
     if (oldDevice.name != newDevice.name) {
-      changes.add('name="${newDevice.name}"');
+      changes.add('nickname="${newDevice.name}"');
     }
     if (oldDevice.deviceType != newDevice.deviceType) {
       changes.add('type=${newDevice.deviceType.name}');

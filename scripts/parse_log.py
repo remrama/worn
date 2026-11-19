@@ -64,7 +64,7 @@ TIME_COLUMNS = [
 
 # key=value fields on DEVICE_* entries and the column each one fills
 _DEVICE_FIELDS = {
-    "name": "name",
+    "nickname": "name",
     "type": "device_type",
     "status": "status",
     "location": "location",
@@ -239,7 +239,7 @@ def parse_log(filepath: str, tz: str | None = None) -> pd.DataFrame:
         - log_time: When the entry was written
         - event_type: Entry type (DEVICE_ADDED, EVENT_STARTED, ...)
         - id: Device or event UUID
-        - name: Device name (DEVICE_*), event name (ACTIVITY_NOTE), or
+        - name: Device nickname (DEVICE_*), event name (ACTIVITY_NOTE), or
           custom name of an `other` event (EVENT_*)
         - device_type, status, location, make, model, serial_number, power: Device
           properties (DEVICE_UPDATED only fills the ones that changed)

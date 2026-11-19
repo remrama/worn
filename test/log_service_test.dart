@@ -170,6 +170,17 @@ void main() {
       expect(make, greaterThan(0));
       expect(model, make + 1);
       expect(fields[model + 1], 'sn=SN1');
+      expect(fields[3], 'nickname="MyWatch"');
+    });
+
+    test('logDeviceUpdated writes a renamed device as nickname=', () async {
+      final service = LogService.instance;
+      final oldDevice = Device(id: 'device-5', name: 'Old');
+      await service.logDeviceUpdated(
+          oldDevice, oldDevice.copyWith(name: 'New'));
+
+      final fields = (await service.getLogLines()).first.split('\t');
+      expect(fields.sublist(3), ['"Old"', 'nickname="New"']);
     });
 
     test('logDeviceAdded writes empty quotes when make and model are unset',

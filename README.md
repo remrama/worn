@@ -63,7 +63,7 @@ The log is plain text, one entry per line, with fields separated by tabs. Here's
 
 ```
 2024-01-14T22:00:00.000-05:00	GLOBAL_TRACKING	on
-2024-01-14T22:01:00.000-05:00	DEVICE_ADDED	d1	name="Ring"	type=ring	status=worn	location=leftIndexFinger	make="Oura"	model="Gen 3"	sn=none	power=on
+2024-01-14T22:01:00.000-05:00	DEVICE_ADDED	d1	nickname="Ring"	type=ring	status=worn	location=leftIndexFinger	make="Oura"	model="Gen 3"	sn=none	power=on
 2024-01-14T22:30:00.000-05:00	EVENT_STARTED	e1	inBed
 2024-01-14T22:50:00.000-05:00	EVENT_STARTED	e2	lightsOut	earliest=2024-01-14T22:40:00.000-05:00	latest=2024-01-14T22:45:00.000-05:00
 2024-01-15T06:55:00.000-05:00	EVENT_STOPPED	e2	lightsOut	earliest=2024-01-14T22:40:00.000-05:00	latest=2024-01-14T22:45:00.000-05:00	2024-01-15T06:30:00.000-05:00
@@ -87,15 +87,15 @@ The rest depends on the entry type:
 
 | Entry type | Remaining fields | Written when |
 |---|---|---|
-| `DEVICE_ADDED` | device ID, `name="…"`, `type=`, `status=`, `location=`, `make="…"`, `model="…"` (`""` if blank), `sn=` (`none` if blank), `power=` (`on`/`off`) | A device is added |
-| `DEVICE_UPDATED` | device ID, `"old name"`, then only the fields that changed (same `key=value` form), then `effective=` if backdated | A device's status, location, power, or details change |
-| `DEVICE_DELETED` | device ID, `"name"` | A device is deleted |
+| `DEVICE_ADDED` | device ID, `nickname="…"`, `type=`, `status=`, `location=`, `make="…"`, `model="…"` (`""` if blank), `sn=` (`none` if blank), `power=` (`on`/`off`) | A device is added |
+| `DEVICE_UPDATED` | device ID, `"old nickname"`, then only the fields that changed (same `key=value` form), then `effective=` if backdated | A device's status, location, power, or details change |
+| `DEVICE_DELETED` | device ID, `"nickname"` | A device is deleted |
 | `EVENT_STARTED` | event ID, event type, `name="…"` (custom events only), start time | Start is tapped |
 | `EVENT_STOPPED` | event ID, event type, `name="…"` (custom events only), start time, stop time | Stop is tapped |
 | `EVENT_RETROACTIVE` | event ID, event type, `name="…"` (custom events only), start time, stop time | A past event is logged in one go (long-press the event row) |
 | `EVENT_CANCELLED` | event ID, event type, `name="…"` (custom events only) | A running event is cancelled (disregard its `EVENT_STARTED`) |
 | `GLOBAL_NOTE` | note | A general note is added |
-| `DEVICE_NOTE` | device ID, device name, note | A note is added to a device |
+| `DEVICE_NOTE` | device ID, device nickname, note | A note is added to a device |
 | `ACTIVITY_NOTE` | event ID, event name, note | A note is added to a running event |
 | `GLOBAL_TRACKING` | `on` or `off` | Tracking is resumed or paused. Treat time between `off` and the next `on` as not covered by the log. |
 
@@ -161,7 +161,7 @@ df = parse_log("worn_log.txt")
 | `log_time` | every row | When the line was written |
 | `event_type` | every row | Entry type (`DEVICE_ADDED`, `EVENT_STOPPED`, …) |
 | `id` | all but `GLOBAL_*` | Device or event ID. Use this, not the name, to follow a device or event across rows. |
-| `name` | `DEVICE_*`, `ACTIVITY_NOTE`, custom `EVENT_*` | Device name (the new name if renamed), or event name. On `EVENT_*` rows, only custom (`other`) events have one. |
+| `name` | `DEVICE_*`, `ACTIVITY_NOTE`, custom `EVENT_*` | Device nickname (the new one if renamed), or event name. On `EVENT_*` rows, only custom (`other`) events have one. |
 | `device_type`, `status`, `location`, `make`, `model`, `serial_number`, `power` | `DEVICE_ADDED`, `DEVICE_UPDATED` | Device fields. `DEVICE_UPDATED` only fills the ones that changed. A blank `make`, `model`, or `serial_number` is empty. |
 | `effective_time` | `DEVICE_UPDATED` | When a backdated change actually happened |
 | `event_subtype` | `EVENT_*` | Event type (`walk`, `inBed`, …) |
