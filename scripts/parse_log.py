@@ -35,6 +35,8 @@ COLUMNS = [
     "device_type",
     "status",
     "location",
+    "make",
+    "model",
     "serial_number",
     "power",
     "event_subtype",
@@ -66,6 +68,8 @@ _DEVICE_FIELDS = {
     "type": "device_type",
     "status": "status",
     "location": "location",
+    "make": "make",
+    "model": "model",
     "sn": "serial_number",
     "power": "power",
 }
@@ -97,8 +101,8 @@ def _parse_device_fields(fields: list[str]) -> dict:
             continue
         if key in _DEVICE_FIELDS:
             value = _unquote(value)
-            if key == "sn" and value == "none":
-                value = None
+            if (key == "sn" and value == "none") or value == "":
+                value = None  # unset or cleared
             result[_DEVICE_FIELDS[key]] = value
         elif key == "effective":
             result["effective_time"] = _parse_timestamp(value)
@@ -237,7 +241,7 @@ def parse_log(filepath: str, tz: str | None = None) -> pd.DataFrame:
         - id: Device or event UUID
         - name: Device name (DEVICE_*), event name (ACTIVITY_NOTE), or
           custom name of an `other` event (EVENT_*)
-        - device_type, status, location, serial_number, power: Device
+        - device_type, status, location, make, model, serial_number, power: Device
           properties (DEVICE_UPDATED only fills the ones that changed)
         - event_subtype: Event type for EVENT_* (walk, run, inBed, ...)
         - effective_time: Backdated time of a DEVICE_UPDATED change

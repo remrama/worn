@@ -148,6 +148,66 @@ void main() {
     });
   });
 
+  group('LogService device make and model', () {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      LogService.resetForTesting();
+    });
+
+    test('logDeviceAdded writes make and model before sn', () async {
+      final service = LogService.instance;
+      await service.logDeviceAdded(Device(
+        id: 'device-1',
+        name: 'MyWatch',
+        make: 'Garmin',
+        model: 'Venu 3',
+        serialNumber: 'SN1',
+      ));
+
+      final fields = (await service.getLogLines()).first.split('\t');
+      final make = fields.indexOf('make="Garmin"');
+      final model = fields.indexOf('model="Venu 3"');
+      expect(make, greaterThan(0));
+      expect(model, make + 1);
+      expect(fields[model + 1], 'sn=SN1');
+    });
+
+    test('logDeviceAdded writes empty quotes when make and model are unset',
+        () async {
+      final service = LogService.instance;
+      await service.logDeviceAdded(Device(id: 'device-2', name: 'MyRing'));
+
+      final fields = (await service.getLogLines()).first.split('\t');
+      expect(fields, contains('make=""'));
+      expect(fields, contains('model=""'));
+    });
+
+    test('logDeviceUpdated writes only the changed make or model', () async {
+      final service = LogService.instance;
+      final oldDevice =
+          Device(id: 'device-3', name: 'MyBand', make: 'Polar', model: 'A');
+      final newDevice = Device(
+          id: 'device-3', name: 'MyBand', make: 'Polar', model: 'Verity');
+
+      await service.logDeviceUpdated(oldDevice, newDevice);
+
+      final logLine = (await service.getLogLines()).first;
+      expect(logLine, contains('model="Verity"'));
+      expect(logLine, isNot(contains('make=')));
+    });
+
+    test('logDeviceUpdated writes empty quotes when make is cleared', () async {
+      final service = LogService.instance;
+      final oldDevice = Device(id: 'device-4', name: 'MyBand', make: 'Polar');
+      final newDevice = Device(id: 'device-4', name: 'MyBand');
+
+      await service.logDeviceUpdated(oldDevice, newDevice);
+
+      final logLine = (await service.getLogLines()).first;
+      expect(logLine.split('\t'), contains('make=""'));
+    });
+  });
+
   group('LogService device update with effective time', () {
     setUp(() async {
       SharedPreferences.setMockInitialValues({});

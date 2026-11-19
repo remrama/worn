@@ -726,6 +726,14 @@ class _LogsScreenState extends State<LogsScreen> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(d.name),
+                      if (d.makeModel != null)
+                        Text(
+                          d.makeModel!,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
                       if (d.serialNumber != null)
                         Text(
                           d.serialNumber!,
@@ -872,6 +880,8 @@ class DeviceDialog extends StatefulWidget {
 
 class _DeviceDialogState extends State<DeviceDialog> {
   final _nameController = TextEditingController();
+  final _makeController = TextEditingController();
+  final _modelController = TextEditingController();
   final _snController = TextEditingController();
   late DeviceType _selectedType;
   late DeviceLocation _selectedLocation;
@@ -883,6 +893,8 @@ class _DeviceDialogState extends State<DeviceDialog> {
     super.initState();
     if (widget.device != null) {
       _nameController.text = widget.device!.name;
+      _makeController.text = widget.device!.make ?? '';
+      _modelController.text = widget.device!.model ?? '';
       _snController.text = widget.device!.serialNumber ?? '';
       _selectedType = widget.device!.deviceType;
       _selectedLocation = widget.device!.location;
@@ -899,6 +911,8 @@ class _DeviceDialogState extends State<DeviceDialog> {
   @override
   void dispose() {
     _nameController.dispose();
+    _makeController.dispose();
+    _modelController.dispose();
     _snController.dispose();
     super.dispose();
   }
@@ -906,6 +920,8 @@ class _DeviceDialogState extends State<DeviceDialog> {
   void _submit() {
     final name = _nameController.text.trim();
     if (name.isEmpty) return;
+    final make = _makeController.text.trim();
+    final model = _modelController.text.trim();
     final sn = _snController.text.trim();
 
     final device = Device(
@@ -914,6 +930,8 @@ class _DeviceDialogState extends State<DeviceDialog> {
       deviceType: _selectedType,
       status: widget.device?.status ?? _selectedStatus,
       location: _selectedLocation,
+      make: make.isEmpty ? null : make,
+      model: model.isEmpty ? null : model,
       serialNumber: sn.isEmpty ? null : sn,
       isPoweredOn: _isPoweredOn,
     );
@@ -952,7 +970,7 @@ class _DeviceDialogState extends State<DeviceDialog> {
           children: [
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: 'Name'),
+              decoration: const InputDecoration(labelText: 'Nickname'),
               autofocus: true,
             ),
             const SizedBox(height: 12),
@@ -1036,6 +1054,23 @@ class _DeviceDialogState extends State<DeviceDialog> {
                 ),
               ),
             ],
+            const SizedBox(height: 12),
+            // Presets plus free text for less common manufacturers
+            DropdownMenu<String>(
+              controller: _makeController,
+              label: const Text('Make (optional)'),
+              expandedInsets: EdgeInsets.zero,
+              requestFocusOnTap: true,
+              enableFilter: true,
+              dropdownMenuEntries: Device.makePresets
+                  .map((m) => DropdownMenuEntry(value: m, label: m))
+                  .toList(),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _modelController,
+              decoration: const InputDecoration(labelText: 'Model (optional)'),
+            ),
             const SizedBox(height: 12),
             TextField(
               controller: _snController,

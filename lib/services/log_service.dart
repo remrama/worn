@@ -57,8 +57,10 @@ class LogService {
   Future<void> logDeviceAdded(Device device) async {
     final sn = device.serialNumber ?? 'none';
     final power = device.isPoweredOn ? 'on' : 'off';
+    final make = device.make ?? '';
+    final model = device.model ?? '';
     await _append(
-      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\tname="${device.name}"\ttype=${device.deviceType.name}\tstatus=${device.status.name}\tlocation=${device.location.name}\tsn=$sn\tpower=$power',
+      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\tname="${device.name}"\ttype=${device.deviceType.name}\tstatus=${device.status.name}\tlocation=${device.location.name}\tmake="$make"\tmodel="$model"\tsn=$sn\tpower=$power',
     );
   }
 
@@ -74,6 +76,12 @@ class LogService {
     }
     if (oldDevice.deviceType != newDevice.deviceType) {
       changes.add('type=${newDevice.deviceType.name}');
+    }
+    if (oldDevice.make != newDevice.make) {
+      changes.add('make="${newDevice.make ?? ''}"');
+    }
+    if (oldDevice.model != newDevice.model) {
+      changes.add('model="${newDevice.model ?? ''}"');
     }
     if (oldDevice.serialNumber != newDevice.serialNumber) {
       changes.add('sn=${newDevice.serialNumber ?? 'none'}');

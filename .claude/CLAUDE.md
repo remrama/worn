@@ -75,6 +75,7 @@ dart run flutter_launcher_icons
   - Device model includes DeviceType enum (watch, ring, wristband, armband, chestStrap, headband, other)
   - Device model includes DeviceStatus enum (worn, loose, charging) for quick status toggle
   - Device model includes DeviceLocation enum for body placement (filtered by device type)
+  - Device model includes optional make (manufacturer, with presets) and model strings
   - Device model includes isPoweredOn boolean (defaults to true for backward compatibility)
   - EventTemplate model represents tracked event types (persistent list of events user wants to track)
   - Event model represents active/running events with start time windows
@@ -146,8 +147,8 @@ The README's "Log Format" and "Parsing the Log" sections are the user-facing spe
 
 Uses internal variable names for parsing efficiency:
 ```
-2024-01-15T10:30:00.000-05:00	DEVICE_ADDED	uuid	name="MyWatch"	type=watch	status=loose	location=leftWrist	sn=SN123	power=on
-2024-01-15T10:32:00.000-05:00	DEVICE_UPDATED	uuid	"MyWatch"	name="My Watch Renamed"	type=wristband	sn=SN456	status=worn	location=rightWrist	power=off
+2024-01-15T10:30:00.000-05:00	DEVICE_ADDED	uuid	name="MyWatch"	type=watch	status=loose	location=leftWrist	make="Garmin"	model="Venu 3"	sn=SN123	power=on
+2024-01-15T10:32:00.000-05:00	DEVICE_UPDATED	uuid	"MyWatch"	name="My Watch Renamed"	type=wristband	sn=SN456	status=worn	location=rightWrist	model="Venu 3S"	power=off
 2024-01-15T10:45:00.000-05:00	DEVICE_UPDATED	uuid	"My Watch Renamed"	status=loose
 2024-01-15T10:50:00.000-05:00	DEVICE_UPDATED	uuid	"My Watch Renamed"	status=worn	effective=2024-01-15T10:40:00.000-05:00
 2024-01-15T11:00:00.000-05:00	EVENT_STARTED	uuid	walk
@@ -175,6 +176,7 @@ Uses internal variable names for parsing efficiency:
 - Unit tests in `test/event_test.dart` for Event model
 - Unit tests in `test/event_template_test.dart` for EventTemplate model
 - Widget tests in `test/widget_test.dart` for navigation UI
+- Widget tests in `test/device_dialog_test.dart` for the add/edit device dialog
 - Log format tests in `test/log_service_test.dart`
 - Python parser tests in `scripts/test_parse_log.py`: `uv run --with-requirements scripts/requirements.txt pytest scripts`
 - Widget tests in `test/device_type_icon_test.dart` for device type icon sizing
