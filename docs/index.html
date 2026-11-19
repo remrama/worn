@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Worn</title>
+  <meta name="description" content="Manual logging for creating ground-truth data to evaluate wearable device algorithms.">
+  <link rel="icon" type="image/png" href="icon.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+
+<header>
+  <img src="banner.png" alt="Worn">
+  <p><strong>Manual logging for creating ground-truth data to evaluate wearable device algorithms.</strong></p>
+  <nav>
+    <a href="#what">What</a>
+    <a href="#who">Who</a>
+    <a href="#get">Get it</a>
+    <a href="#use">Use it</a>
+    <a href="#data">Process the data</a>
+    <a href="https://github.com/remrama/worn">GitHub</a>
+  </nav>
+</header>
+
+<h2 id="what">What it is</h2>
+<p>
+  Worn is a minimalist Android app for writing down, as it happens, when you wear a device and what
+  you're doing. The output is a timestamped log file that serves as ground truth for evaluating
+  wearable algorithms.
+</p>
+<p>
+  It does <em>not</em> detect anything. It's the opposite: you log events by hand so you have a
+  reference to compare against the output of a commercial wearable or your own algorithm.
+</p>
+<ul>
+  <li><strong>Wear-time validation</strong>: log when a device is worn, loose, or charging.</li>
+  <li><strong>Sleep validation</strong>: log bedtime, lights-out, and wake.</li>
+  <li><strong>Activity labeling</strong>: mark when you walked, ran, swam, etc.</li>
+</ul>
+<p>
+  The design is minimal on purpose, borderline brutalist. It does logging and nothing else.
+</p>
+
+<h2 id="who">Who it's for</h2>
+<p>
+  Researchers who need ground-truth data for wearable validation studies. If you're checking a
+  watch's sleep detection or building your own wear-time classifier, you need to know when someone
+  <em>actually</em> went to bed or <em>actually</em> had the device on. Worn makes that logging less
+  painful. Realistically this is useful to a handful of people, and that's fine.
+</p>
+
+<h2 id="get">Get it</h2>
+<ul>
+  <li>
+    <strong>Android (recommended)</strong>: download the APK from the
+    <a href="https://github.com/remrama/worn/releases/latest">latest release</a>, open it on your
+    phone, and follow the prompts. You may need to allow installs from unknown sources.
+  </li>
+  <li>
+    <strong>Web demo</strong>: <a href="https://worn-one.vercel.app">worn-one.vercel.app</a>.
+    Fine for a test drive, but don't use it for real logging. Real logging needs your phone and
+    notifications.
+  </li>
+  <li><strong>iOS</strong>: not available, and not planned.</li>
+</ul>
+
+<h2 id="use">How to use it</h2>
+<p>
+  The app has two tabs: <strong>Logs</strong>, where you do everything, and
+  <strong>History</strong>, where you see and export the raw log. The three round buttons at the
+  bottom right of Logs add a note, an event type, and a device (top to bottom).
+</p>
+
+<h3>1. Set up while paused</h3>
+<p>
+  Worn starts <strong>Paused</strong> (orange bar). While paused you can add and edit devices and
+  write notes, but not change status or start events. Add your devices first:
+</p>
+<ul>
+  <li>
+    <strong>Add device</strong> (watch button): nickname, type, body location, initial status,
+    and optionally make, model, and serial number. Nicknames must be unique.
+  </li>
+  <li>
+    <strong>Add event type</strong> (calendar button): pick from In Bed, Lights Out, Walk, Run,
+    Workout, Swim, Watch TV, or Other (give it your own name, like "Nap"). These stay in your list
+    so you can start them with one tap.
+  </li>
+</ul>
+<p>
+  Then flip the switch at the top right to <strong>Tracking</strong>. Pause again whenever you stop
+  logging (e.g. a day off). Time between a pause and the next resume counts as not covered.
+</p>
+
+<h3>2. Log device status</h3>
+<p>
+  Each device has three buttons: <kbd>W</kbd> worn, <kbd>L</kbd> loose, <kbd>C</kbd> charging. Tap
+  one when the device's status changes. Location, power on/off, and the other details live under
+  the device's edit (pencil) button. A powered-off device's icon is dimmed.
+</p>
+
+<h3>3. Start and stop events</h3>
+<p>
+  Tap the blue play button next to an event type to start it now. It turns green and shows its
+  start time and running duration. Tap again to stop it now. While it runs you can add a note to it
+  or cancel it (red &times;) if you started it by mistake.
+</p>
+
+<h3>4. Fix the time when you log late</h3>
+<p>You'll often log things after the fact. Three gestures cover that:</p>
+<ul>
+  <li>
+    <strong>Long-press</strong> <kbd>W</kbd>/<kbd>L</kbd>/<kbd>C</kbd>: pick when the status
+    actually changed (15m, 30m, 1h, 2h ago, or a custom time).
+  </li>
+  <li>
+    <strong>Long-press</strong> the start/stop button: same presets, plus an
+    <em>uncertain time window</em> when you only know it happened sometime between two times
+    ("lights out was sometime between 10:40 and 10:45").
+  </li>
+  <li>
+    <strong>Long-press the event row</strong> (when it isn't running): log a whole past event in
+    one go, with a start and a stop, each either exact or a window.
+  </li>
+</ul>
+<p>
+  The log keeps both when you wrote each line and when the thing happened, so late entries are
+  never confused with on-time ones.
+</p>
+
+<h3>5. Notes</h3>
+<p>
+  Add a general note with the note button at the bottom right, a device note with the note icon on
+  a device, or an event note on a running event. Notes work even while paused.
+</p>
+
+<h3>6. Don't forget running events</h3>
+<p>
+  On Android, Worn shows a silent, ongoing notification for each running event (with its
+  duration), so you don't leave something running overnight by accident. Each powered-on device
+  also gets a notification showing its status, with W/L/C buttons so you can change it without
+  opening the app.
+</p>
+
+<h3>7. Export</h3>
+<p>
+  On the <strong>History</strong> tab, tap the share icon. <strong>Share as file</strong> sends
+  <code>worn_log.txt</code> to Drive, email, etc.; use this one. <strong>Share as text</strong>
+  shares the raw log as a message, and is the only option on the web demo. Export regularly: the
+  log lives only on your phone, and <em>Wipe All Data</em> (in the History menu) can't be undone.
+</p>
+
+<h2 id="data">Process the data</h2>
+<p>
+  The log is plain text, one entry per line, tab-separated. Every line starts with when it was
+  written (ISO 8601 local time with UTC offset) and an entry type. Here's a night of sleep and a
+  walk logged after the fact (IDs shortened; real ones are UUIDs):
+</p>
+<pre><code>2024-01-14T22:00:00.000-05:00	GLOBAL_TRACKING	on
+2024-01-14T22:01:00.000-05:00	DEVICE_ADDED	d1	nickname="Ring"	type=ring	status=worn	location=leftIndexFinger	make="Oura"	model="Gen 3"	sn=none	power=on
+2024-01-14T22:30:00.000-05:00	EVENT_STARTED	e1	inBed
+2024-01-14T22:50:00.000-05:00	EVENT_STARTED	e2	lightsOut	earliest=2024-01-14T22:40:00.000-05:00	latest=2024-01-14T22:45:00.000-05:00
+2024-01-15T06:55:00.000-05:00	EVENT_STOPPED	e2	lightsOut	earliest=2024-01-14T22:40:00.000-05:00	latest=2024-01-14T22:45:00.000-05:00	2024-01-15T06:30:00.000-05:00
+2024-01-15T07:00:00.000-05:00	EVENT_STOPPED	e1	inBed	2024-01-14T22:30:00.000-05:00
+2024-01-15T07:05:00.000-05:00	DEVICE_UPDATED	d1	"Ring"	status=charging
+2024-01-15T07:40:00.000-05:00	DEVICE_UPDATED	d1	"Ring"	status=worn	effective=2024-01-15T07:30:00.000-05:00
+2024-01-15T07:41:00.000-05:00	DEVICE_NOTE	d1	Ring	Battery was at 20%
+2024-01-15T12:00:00.000-05:00	EVENT_RETROACTIVE	e3	walk	2024-01-15T09:00:00.000-05:00	earliest=2024-01-15T09:40:00.000-05:00	latest=2024-01-15T09:45:00.000-05:00</code></pre>
+<p>
+  Reading it: in bed at 22:30, lights out sometime between 22:40 and 22:45 (logged a few minutes
+  late), lights on at 06:30, up at 07:00. The ring was charging from 07:05 until 07:30 (that change
+  was logged at 07:40, so it's backdated with <code>effective=</code>). The walk ran from 09:00
+  until sometime between 09:40 and 09:45, all logged at noon.
+</p>
+<p>
+  The short version of the rules: a time on an event line is either absent (it happened when the
+  line was written), a single timestamp (backdated), or an <code>earliest=</code>/<code>latest=</code>
+  window. Start comes first, then stop. Every <code>EVENT_STOPPED</code> and
+  <code>EVENT_RETROACTIVE</code> line describes one complete event by itself. The full field
+  reference is in the README's
+  <a href="https://github.com/remrama/worn#log-format">Log Format</a> section.
+</p>
+
+<h3>Parse it with Python</h3>
+<p>
+  <a href="https://github.com/remrama/worn/blob/main/scripts/parse_log.py"><code>scripts/parse_log.py</code></a>
+  turns the log into a <a href="https://pandas.pydata.org">pandas</a> DataFrame with one row per
+  line and one column per field. With <a href="https://docs.astral.sh/uv/">uv</a> it installs
+  pandas for you. From the command line, print a summary and save a CSV (for R, Excel, etc.):
+</p>
+<pre><code>uv run scripts/parse_log.py worn_log.txt --csv worn_log.csv</code></pre>
+<p>Or from Python, with <code>parse_log.py</code> next to your analysis code:</p>
+<pre><code>import pandas as pd
+from parse_log import parse_log
+
+df = parse_log("worn_log.txt")
+
+# Each EVENT_STOPPED / EVENT_RETROACTIVE row is one complete event
+done = df[df["event_type"].isin(["EVENT_STOPPED", "EVENT_RETROACTIVE"])]
+
+def best_guess(rows, prefix):
+    """Exact time if logged, else the window's midpoint, else the line's own time."""
+    earliest, latest = rows[f"{prefix}_earliest"], rows[f"{prefix}_latest"]
+    return (
+        rows[f"{prefix}_time"]
+        .fillna(earliest + (latest - earliest) / 2)
+        .fillna(rows["log_time"])
+    )
+
+events = pd.DataFrame({
+    "event": done["name"].fillna(done["event_subtype"]),  # custom events by name
+    "start": best_guess(done, "start"),
+    "stop": best_guess(done, "stop"),
+})</code></pre>
+<pre><code>       event                     start                      stop
+4  lightsOut 2024-01-14 22:42:30-05:00 2024-01-15 06:30:00-05:00
+5      inBed 2024-01-14 22:30:00-05:00 2024-01-15 07:00:00-05:00
+9       walk 2024-01-15 09:00:00-05:00 2024-01-15 09:42:30-05:00</code></pre>
+<p>
+  The midpoint is only one choice. Keep <code>*_earliest</code> and <code>*_latest</code> if you
+  want to account for the uncertainty, e.g. by scoring a wearable against both ends of the window.
+  The README's <a href="https://github.com/remrama/worn#parsing-the-log">Parsing the Log</a>
+  section lists every column, covers time zones, and shows how to get device status intervals the
+  same way.
+</p>
+
+<footer>
+  <a href="https://github.com/remrama/worn">github.com/remrama/worn</a>
+  &middot; <a href="https://github.com/remrama/worn/issues">Report an issue</a>
+</footer>
+
+</main>
+</body>
+</html>

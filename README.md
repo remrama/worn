@@ -10,6 +10,8 @@
 
 **Manual logging for creating ground-truth data to evaluate wearable device algorithms.**
 
+**Website**: [remrama.github.io/worn](https://remrama.github.io/worn/) covers how to use the app and how to process its log.
+
 ## What This Is
 
 Worn is a minimalist mobile app for manually logging when you wear a device and what you're doing. The output is a timestamped log file you can use as ground truth for evaluating wearable algorithms—wear-time detection, sleep/wake classification, activity recognition, etc.
