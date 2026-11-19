@@ -90,10 +90,10 @@ The rest depends on the entry type:
 | `DEVICE_ADDED` | device ID, `name="…"`, `type=`, `status=`, `location=`, `sn=` (`none` if blank), `power=` (`on`/`off`) | A device is added |
 | `DEVICE_UPDATED` | device ID, `"old name"`, then only the fields that changed (same `key=value` form), then `effective=` if backdated | A device's status, location, power, or details change |
 | `DEVICE_DELETED` | device ID, `"name"` | A device is deleted |
-| `EVENT_STARTED` | event ID, event type, start time | Start is tapped |
-| `EVENT_STOPPED` | event ID, event type, start time, stop time | Stop is tapped |
-| `EVENT_RETROACTIVE` | event ID, event type, start time, stop time | A past event is logged in one go (long-press the event row) |
-| `EVENT_CANCELLED` | event ID, event type | A running event is cancelled (disregard its `EVENT_STARTED`) |
+| `EVENT_STARTED` | event ID, event type, `name="…"` (custom events only), start time | Start is tapped |
+| `EVENT_STOPPED` | event ID, event type, `name="…"` (custom events only), start time, stop time | Stop is tapped |
+| `EVENT_RETROACTIVE` | event ID, event type, `name="…"` (custom events only), start time, stop time | A past event is logged in one go (long-press the event row) |
+| `EVENT_CANCELLED` | event ID, event type, `name="…"` (custom events only) | A running event is cancelled (disregard its `EVENT_STARTED`) |
 | `GLOBAL_NOTE` | note | A general note is added |
 | `DEVICE_NOTE` | device ID, device name, note | A note is added to a device |
 | `ACTIVITY_NOTE` | event ID, event name, note | A note is added to a running event |
@@ -101,7 +101,7 @@ The rest depends on the entry type:
 
 Values used in those fields:
 
-- **Event types**: `inBed`, `lightsOut`, `walk`, `run`, `workout`, `swim`, `watchTv`, `other`. Custom-named events are logged as `other`; the custom name appears only on `ACTIVITY_NOTE` lines.
+- **Event types**: `inBed`, `lightsOut`, `walk`, `run`, `workout`, `swim`, `watchTv`, `other`. Custom events are logged as `other`, with their name in a `name="…"` field right after the type (e.g. `name="Nap"`), so two custom events can be told apart. Other event types have no `name=` field.
 - **Device types**: `watch`, `ring`, `wristband`, `armband`, `chestStrap`, `headband`, `other`
 - **Device status**: `worn`, `loose`, `charging`
 - **Device locations**: `leftWrist`, `rightWrist`, `leftAnkle`, `rightAnkle`, `leftUpperArm`, `rightUpperArm`, `leftThigh`, `rightThigh`, `chest`, `waist`, `neck`, `head`, `other`, and fingers as `leftIndexFinger` through `leftPinkyFinger`, `leftThumb` (same for `right…`)
@@ -161,7 +161,7 @@ df = parse_log("worn_log.txt")
 | `log_time` | every row | When the line was written |
 | `event_type` | every row | Entry type (`DEVICE_ADDED`, `EVENT_STOPPED`, …) |
 | `id` | all but `GLOBAL_*` | Device or event ID. Use this, not the name, to follow a device or event across rows. |
-| `name` | `DEVICE_*`, `ACTIVITY_NOTE` | Device name (the new name if renamed), or event name |
+| `name` | `DEVICE_*`, `ACTIVITY_NOTE`, custom `EVENT_*` | Device name (the new name if renamed), or event name. On `EVENT_*` rows, only custom (`other`) events have one. |
 | `device_type`, `status`, `location`, `serial_number`, `power` | `DEVICE_ADDED`, `DEVICE_UPDATED` | Device fields. `DEVICE_UPDATED` only fills the ones that changed. |
 | `effective_time` | `DEVICE_UPDATED` | When a backdated change actually happened |
 | `event_subtype` | `EVENT_*` | Event type (`walk`, `inBed`, …) |
@@ -197,7 +197,7 @@ def best_guess(rows, prefix):
     )
 
 events = pd.DataFrame({
-    "event": done["event_subtype"],
+    "event": done["name"].fillna(done["event_subtype"]),  # custom events by name
     "start": best_guess(done, "start"),
     "stop": best_guess(done, "stop"),
 })

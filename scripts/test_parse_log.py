@@ -260,6 +260,112 @@ def test_event_retroactive_with_windows(tmp_path):
     assert row["stop_latest"] == _ts("2024-01-15T06:30:00-05:00")
 
 
+def test_built_in_events_have_no_name(df):
+    events = df[df["event_type"].str.startswith("EVENT_")]
+    assert len(events) == 8
+    assert events["name"].isna().all()
+
+
+# Custom-named `other` events carry name="..." right after the event type
+CUSTOM_LOG = """\
+2024-01-15T13:00:00.000-05:00\tEVENT_STARTED\tuuid-nap\tother\tname="Nap"
+2024-01-15T13:05:00.000-05:00\tEVENT_STARTED\tuuid-med\tother\tname="Meditate"\tearliest=2024-01-15T12:55:00.000-05:00\tlatest=2024-01-15T13:00:00.000-05:00
+2024-01-15T13:30:00.000-05:00\tEVENT_STOPPED\tuuid-med\tother\tname="Meditate"\tearliest=2024-01-15T12:55:00.000-05:00\tlatest=2024-01-15T13:00:00.000-05:00\t2024-01-15T13:25:00.000-05:00
+2024-01-15T14:00:00.000-05:00\tEVENT_STOPPED\tuuid-nap\tother\tname="Nap"\t2024-01-15T13:00:00.000-05:00
+2024-01-15T15:00:00.000-05:00\tEVENT_RETROACTIVE\tuuid-read\tother\tname="Read"\t2024-01-15T14:00:00.000-05:00\tearliest=2024-01-15T14:40:00.000-05:00\tlatest=2024-01-15T14:45:00.000-05:00
+2024-01-15T15:05:00.000-05:00\tEVENT_STARTED\tuuid-str\tother\tname="Stretch"\t2024-01-15T15:00:00.000-05:00
+2024-01-15T15:06:00.000-05:00\tEVENT_CANCELLED\tuuid-str\tother\tname="Stretch"
+2024-01-15T15:10:00.000-05:00\tEVENT_STARTED\tuuid-old\tother
+"""
+
+
+@pytest.fixture
+def custom_df(tmp_path):
+    return parse_log(_write(tmp_path, CUSTOM_LOG))
+
+
+def test_custom_event_names(custom_df):
+    assert list(custom_df["event_subtype"]) == ["other"] * 8
+    assert list(custom_df["name"][:7]) == [
+        "Nap",
+        "Meditate",
+        "Meditate",
+        "Nap",
+        "Read",
+        "Stretch",
+        "Stretch",
+    ]
+
+
+def test_other_event_without_name(custom_df):
+    """Logs written before custom names were recorded have no name= field."""
+    row = custom_df.iloc[7]
+    assert row["id"] == "uuid-old"
+    assert pd.isna(row["name"])
+    assert pd.isna(row["start_time"])
+
+
+def test_custom_event_started_now(custom_df):
+    row = custom_df.iloc[0]
+    for col in ["start_time", "start_earliest", "start_latest"]:
+        assert pd.isna(row[col])
+
+
+def test_custom_event_started_with_window(custom_df):
+    row = custom_df.iloc[1]
+    assert pd.isna(row["start_time"])
+    assert row["start_earliest"] == _ts("2024-01-15T12:55:00-05:00")
+    assert row["start_latest"] == _ts("2024-01-15T13:00:00-05:00")
+
+
+def test_custom_event_started_backdated(custom_df):
+    row = custom_df.iloc[5]
+    assert row["start_time"] == _ts("2024-01-15T15:00:00-05:00")
+    assert pd.isna(row["start_earliest"])
+
+
+def test_custom_event_stopped_start_window_and_precise_stop(custom_df):
+    row = custom_df.iloc[2]
+    assert pd.isna(row["start_time"])
+    assert row["start_earliest"] == _ts("2024-01-15T12:55:00-05:00")
+    assert row["start_latest"] == _ts("2024-01-15T13:00:00-05:00")
+    assert row["stop_time"] == _ts("2024-01-15T13:25:00-05:00")
+    assert pd.isna(row["stop_earliest"]) and pd.isna(row["stop_latest"])
+
+
+def test_custom_event_stopped_start_only(custom_df):
+    row = custom_df.iloc[3]
+    assert row["start_time"] == _ts("2024-01-15T13:00:00-05:00")
+    for col in ["stop_time", "stop_earliest", "stop_latest"]:
+        assert pd.isna(row[col])
+
+
+def test_custom_event_retroactive(custom_df):
+    row = custom_df.iloc[4]
+    assert row["start_time"] == _ts("2024-01-15T14:00:00-05:00")
+    assert pd.isna(row["start_earliest"])
+    assert pd.isna(row["stop_time"])
+    assert row["stop_earliest"] == _ts("2024-01-15T14:40:00-05:00")
+    assert row["stop_latest"] == _ts("2024-01-15T14:45:00-05:00")
+
+
+def test_custom_event_cancelled(custom_df):
+    row = custom_df.iloc[6]
+    assert row["event_type"] == "EVENT_CANCELLED"
+    assert row["id"] == "uuid-str"
+    assert row["name"] == "Stretch"
+
+
+def test_custom_event_name_with_quotes_and_equals(tmp_path):
+    line = (
+        "2024-01-15T12:00:00.000-05:00\tEVENT_STOPPED\tuuid-1\tother\t"
+        'name="Nap = "power" nap"\t2024-01-15T11:00:00.000-05:00'
+    )
+    row = parse_log(_write(tmp_path, line)).iloc[0]
+    assert row["name"] == 'Nap = "power" nap'
+    assert row["start_time"] == _ts("2024-01-15T11:00:00-05:00")
+
+
 # A log spanning the US spring-forward change (CST -06:00 -> CDT -05:00)
 DST_LOG = """\
 2024-03-09T22:00:00.000-06:00\tEVENT_STARTED\tuuid-1\tinBed

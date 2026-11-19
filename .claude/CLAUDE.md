@@ -140,7 +140,7 @@ Tab-separated entries. Every timestamp (log time, event times, `effective=`) is 
 - **Backdated precise time**: Single timestamp appended
 - **Time window** (uncertainty): `earliest=` and `latest=` key=value pairs appended
 
-Event times are positional: start first, then stop. `EVENT_STOPPED` and `EVENT_RETROACTIVE` always write the start time when they write a stop time, so a lone time is always the start. `DEVICE_UPDATED` writes only changed fields, plus `effective=` when backdated.
+Event times are positional: start first, then stop. `EVENT_STOPPED` and `EVENT_RETROACTIVE` always write the start time when they write a stop time, so a lone time is always the start. Custom-named `other` events write `name="<customName>"` right after the event type on every `EVENT_*` line (before any times); other event types never write `name=`. `DEVICE_UPDATED` writes only changed fields, plus `effective=` when backdated.
 
 The README's "Log Format" and "Parsing the Log" sections are the user-facing spec, and `scripts/parse_log.py` parses it. Keep all three in sync with `LogService` when the format changes.
 
@@ -158,6 +158,8 @@ Uses internal variable names for parsing efficiency:
 2024-01-15T11:36:00.000-05:00	EVENT_STARTED	uuid	swim
 2024-01-15T11:40:00.000-05:00	EVENT_CANCELLED	uuid	swim
 2024-01-15T11:45:00.000-05:00	EVENT_RETROACTIVE	uuid	inBed	2024-01-14T22:00:00.000-05:00	2024-01-15T06:00:00.000-05:00
+2024-01-15T11:46:00.000-05:00	EVENT_STARTED	uuid	other	name="Nap"	earliest=2024-01-15T11:30:00.000-05:00	latest=2024-01-15T11:40:00.000-05:00
+2024-01-15T11:48:00.000-05:00	EVENT_CANCELLED	uuid	other	name="Nap"
 2024-01-15T11:50:00.000-05:00	DEVICE_DELETED	uuid	"My Watch Renamed"
 2024-01-15T12:00:00.000-05:00	GLOBAL_NOTE	User added a custom note
 2024-01-15T12:05:00.000-05:00	DEVICE_NOTE	uuid	MyWatch	Device-specific note
