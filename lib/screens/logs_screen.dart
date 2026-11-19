@@ -729,18 +729,20 @@ class _LogsScreenState extends State<LogsScreen> {
                       if (d.makeModel != null)
                         Text(
                           d.makeModel!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
-                            color: Colors.grey,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                       if (d.serialNumber != null)
                         Text(
                           d.serialNumber!,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12,
                             fontFamily: 'monospace',
-                            color: Colors.grey,
+                            color:
+                                Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                         ),
                     ],

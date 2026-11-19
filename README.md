@@ -162,7 +162,7 @@ df = parse_log("worn_log.txt")
 | `event_type` | every row | Entry type (`DEVICE_ADDED`, `EVENT_STOPPED`, …) |
 | `id` | all but `GLOBAL_*` | Device or event ID. Use this, not the name, to follow a device or event across rows. |
 | `name` | `DEVICE_*`, `ACTIVITY_NOTE`, custom `EVENT_*` | Device nickname (the new one if renamed), or event name. On `EVENT_*` rows, only custom (`other`) events have one. |
-| `device_type`, `status`, `location`, `make`, `model`, `serial_number`, `power` | `DEVICE_ADDED`, `DEVICE_UPDATED` | Device fields. `DEVICE_UPDATED` only fills the ones that changed. A blank `make`, `model`, or `serial_number` is empty. |
+| `device_type`, `status`, `location`, `make`, `model`, `serial_number`, `power` | `DEVICE_ADDED`, `DEVICE_UPDATED` | Device fields. `DEVICE_UPDATED` only fills the ones that changed. A blank (or cleared) `make`, `model`, or `serial_number` is an empty string, not `NaN`, so on `DEVICE_UPDATED` a cleared field is distinct from an unchanged one. |
 | `effective_time` | `DEVICE_UPDATED` | When a backdated change actually happened |
 | `event_subtype` | `EVENT_*` | Event type (`walk`, `inBed`, …) |
 | `start_time`, `stop_time` | `EVENT_*` | Exact start / stop time when backdated |

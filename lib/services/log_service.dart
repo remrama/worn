@@ -57,10 +57,11 @@ class LogService {
   Future<void> logDeviceAdded(Device device) async {
     final sn = device.serialNumber ?? 'none';
     final power = device.isPoweredOn ? 'on' : 'off';
-    final make = device.make ?? '';
-    final model = device.model ?? '';
+    final name = _sanitize(device.name);
+    final make = _sanitize(device.make ?? '');
+    final model = _sanitize(device.model ?? '');
     await _append(
-      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\tnickname="${device.name}"\ttype=${device.deviceType.name}\tstatus=${device.status.name}\tlocation=${device.location.name}\tmake="$make"\tmodel="$model"\tsn=$sn\tpower=$power',
+      '${_timestamp()}\tDEVICE_ADDED\t${device.id}\tnickname="$name"\ttype=${device.deviceType.name}\tstatus=${device.status.name}\tlocation=${device.location.name}\tmake="$make"\tmodel="$model"\tsn=$sn\tpower=$power',
     );
   }
 
@@ -72,16 +73,16 @@ class LogService {
     final changes = <String>[];
 
     if (oldDevice.name != newDevice.name) {
-      changes.add('nickname="${newDevice.name}"');
+      changes.add('nickname="${_sanitize(newDevice.name)}"');
     }
     if (oldDevice.deviceType != newDevice.deviceType) {
       changes.add('type=${newDevice.deviceType.name}');
     }
     if (oldDevice.make != newDevice.make) {
-      changes.add('make="${newDevice.make ?? ''}"');
+      changes.add('make="${_sanitize(newDevice.make ?? '')}"');
     }
     if (oldDevice.model != newDevice.model) {
-      changes.add('model="${newDevice.model ?? ''}"');
+      changes.add('model="${_sanitize(newDevice.model ?? '')}"');
     }
     if (oldDevice.serialNumber != newDevice.serialNumber) {
       changes.add('sn=${newDevice.serialNumber ?? 'none'}');
@@ -104,19 +105,20 @@ class LogService {
     }
 
     await _append(
-      '${_timestamp()}\tDEVICE_UPDATED\t${newDevice.id}\t"${oldDevice.name}"\t${changes.join('\t')}',
+      '${_timestamp()}\tDEVICE_UPDATED\t${newDevice.id}\t"${_sanitize(oldDevice.name)}"\t${changes.join('\t')}',
     );
   }
 
   Future<void> logDeviceDeleted(Device device) async {
     await _append(
-      '${_timestamp()}\tDEVICE_DELETED\t${device.id}\t"${device.name}"',
+      '${_timestamp()}\tDEVICE_DELETED\t${device.id}\t"${_sanitize(device.name)}"',
     );
   }
 
-  /// Replaces tabs and newlines, which would break the line format, with spaces.
-  String _sanitize(String text) =>
-      text.replaceAll('\t', ' ').replaceAll('\n', ' ');
+  /// Replaces tabs and line breaks, which would break the line format, with
+  /// spaces. Applied to all free text: notes, device and event names, make,
+  /// and model.
+  String _sanitize(String text) => text.replaceAll(RegExp(r'[\t\r\n]'), ' ');
 
   /// The leading fields shared by every EVENT_* entry: log time, entry type,
   /// event ID, event type, and `name="…"` for custom-named `other` events.
@@ -143,10 +145,10 @@ class LogService {
     final sanitized = _sanitize(note);
     if (device != null) {
       await _append(
-          '${_timestamp()}\tDEVICE_NOTE\t${device.id}\t${device.name}\t$sanitized');
+          '${_timestamp()}\tDEVICE_NOTE\t${device.id}\t${_sanitize(device.name)}\t$sanitized');
     } else if (event != null) {
       await _append(
-          '${_timestamp()}\tACTIVITY_NOTE\t${event.id}\t${event.displayName}\t$sanitized');
+          '${_timestamp()}\tACTIVITY_NOTE\t${event.id}\t${_sanitize(event.displayName)}\t$sanitized');
     } else {
       await _append('${_timestamp()}\tGLOBAL_NOTE\t$sanitized');
     }

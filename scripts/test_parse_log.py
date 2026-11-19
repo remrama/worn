@@ -199,7 +199,7 @@ def test_bad_line_reports_line_number(tmp_path):
 def test_serial_number_none(tmp_path):
     line = '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tnickname="Watch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=none\tpower=on'
     df = parse_log(_write(tmp_path, line))
-    assert pd.isna(df.iloc[0]["serial_number"])
+    assert df.iloc[0]["serial_number"] == ""
 
 
 def test_blank_make_and_model(tmp_path):
@@ -208,8 +208,24 @@ def test_blank_make_and_model(tmp_path):
         '2024-01-15T10:31:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"Watch"\tmake=""',
     ]
     df = parse_log(_write(tmp_path, "\n".join(lines)))
-    assert df["make"].isna().all()
-    assert pd.isna(df.iloc[0]["model"])
+    assert list(df["make"]) == ["", ""]
+    assert df.iloc[0]["model"] == ""
+
+
+def test_cleared_field_differs_from_unchanged(tmp_path):
+    """A cleared make is "", an unchanged one is NaN, so ffill keeps the clear."""
+    lines = [
+        '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tnickname="Watch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tmake="Garmin"\tmodel="Venu 3"\tsn=SN1\tpower=on',
+        '2024-01-15T10:31:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"Watch"\tmake=""\tsn=none',
+        '2024-01-15T10:32:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"Watch"\tstatus=worn',
+    ]
+    df = parse_log(_write(tmp_path, "\n".join(lines)))
+    cleared, unchanged = df.iloc[1], df.iloc[2]
+    assert (cleared["make"], cleared["serial_number"]) == ("", "")
+    assert pd.isna(cleared["model"])
+    assert pd.isna(unchanged["make"]) and pd.isna(unchanged["serial_number"])
+    filled = df[["make", "model", "serial_number"]].ffill().iloc[2]
+    assert list(filled) == ["", "Venu 3", ""]
 
 
 def test_older_logs_without_make_and_model(tmp_path):
