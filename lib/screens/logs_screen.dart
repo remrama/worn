@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import '../models/device.dart';
 import '../models/event.dart';
@@ -10,6 +10,7 @@ import '../services/event_template_store.dart';
 import '../services/log_service.dart';
 import '../services/notification_service.dart';
 import '../services/tracking_service.dart';
+import '../widgets/device_type_icon.dart';
 
 class LogsScreen extends StatefulWidget {
   const LogsScreen({super.key});
@@ -718,7 +719,7 @@ class _LogsScreenState extends State<LogsScreen> {
             ..._devices.map((d) => ListTile(
                   leading: Opacity(
                     opacity: d.isPoweredOn ? 1.0 : 0.3,
-                    child: Icon(Device.iconFor(d.deviceType)),
+                    child: DeviceTypeIcon(d.deviceType),
                   ),
                   title: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -966,7 +967,7 @@ class _DeviceDialogState extends State<DeviceDialog> {
                     value: type,
                     child: Row(
                       children: [
-                        Icon(Device.iconFor(type), size: 20),
+                        DeviceTypeIcon(type, size: 20),
                         const SizedBox(width: 8),
                         Text(Device.typeLabel(type)),
                       ],

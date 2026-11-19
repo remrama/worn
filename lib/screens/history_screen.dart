@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/file_sharer.dart';
@@ -32,9 +32,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
   Future<void> _shareLogAsText() async {
     try {
       final content = await LogService.instance.getLogContent();
-      await Share.share(
-        content,
-        subject: 'Worn Log Export',
+      await SharePlus.instance.share(
+        ShareParams(text: content, subject: 'Worn Log Export'),
       );
     } catch (e) {
       if (mounted) {

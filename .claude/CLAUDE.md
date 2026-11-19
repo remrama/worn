@@ -63,6 +63,8 @@ dart run flutter_launcher_icons
 - **deploy-web-preview.yml**: Web preview deployments for all PRs to main
 - **release.yml**: Production release pipeline triggered by version tags (v*.*.*)
 
+**Flutter version:** All workflows pin Flutter `3.50.0` (`flutter-version` in each `subosito/flutter-action` step) so a new stable release can't break CI unannounced. When upgrading, bump every workflow together and match the local SDK. Import Material widgets from `package:material_ui/material_ui.dart` (`package:flutter/material.dart` is deprecated). `font_awesome_flutter` 11 wraps icons in `FaIconData`, which is not an `IconData`: use `FontAwesomeIcons.x.data` where an `IconData` is needed, or render with `FaIcon`.
+
 **Note:** Icon generation (`dart run flutter_launcher_icons`) is NOT required in CI workflows. The generated icon files are already committed to the repository and used automatically during builds. Only run this command locally when updating the source icon image.
 
 ## Architecture
@@ -100,7 +102,8 @@ lib/
 │   ├── log_service.dart   # Event logging (singleton)
 │   ├── notification_service.dart  # Persistent notification for active events (singleton)
 │   └── tracking_service.dart  # Tracking state persistence (singleton, defaults to paused)
-└── widgets/               # Custom reusable widgets
+└── widgets/
+    └── device_type_icon.dart  # Device type icon, sizes Font Awesome glyphs to match Material
 ```
 
 ## Data Persistence
@@ -172,3 +175,4 @@ Uses internal variable names for parsing efficiency:
 - Widget tests in `test/widget_test.dart` for navigation UI
 - Log format tests in `test/log_service_test.dart`
 - Python parser tests in `scripts/test_parse_log.py`: `uv run --with-requirements scripts/requirements.txt pytest scripts`
+- Widget tests in `test/device_type_icon_test.dart` for device type icon sizing
