@@ -1,24 +1,27 @@
 #!/usr/bin/env python3
-"""Tests for parse_log.py"""
+"""Tests for parse_log.py
 
-import tempfile
+Run with:
+    uv run --with-requirements scripts/requirements.txt pytest scripts
+"""
 
 import pandas as pd
 import pytest
-from parse_log import parse_log
+from parse_log import COLUMNS, main, parse_log
 
-
-# Sample log content covering all event types
-SAMPLE_LOG = """2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tname="MyWatch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=SN123\tpower=on
+# A realistic log covering every entry type, as the current app writes it
+SAMPLE_LOG = """\
+2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tname="MyWatch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=SN123\tpower=on
 2024-01-15T10:32:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"MyWatch"\tname="My Watch Renamed"\ttype=wristband\tsn=SN456\tstatus=worn\tlocation=rightWrist\tpower=off
 2024-01-15T10:45:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"My Watch Renamed"\tstatus=loose
-2024-01-15T10:50:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"My Watch Renamed"\tstatus=worn\teffective=2024-01-15T10:40:00.000Z
+2024-01-15T10:50:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"My Watch Renamed"\tstatus=worn\teffective=2024-01-15T10:40:00.000-05:00
 2024-01-15T11:00:00.000-05:00\tEVENT_STARTED\tuuid-event1\twalk
-2024-01-15T11:05:00.000-05:00\tEVENT_STARTED\tuuid-event2\trun\tearliest=2024-01-15T11:00:00.000-05:00\tlatest=2024-01-15T11:05:00.000-05:00
+2024-01-15T11:05:00.000-05:00\tEVENT_STARTED\tuuid-event2\trun\tearliest=2024-01-15T10:55:00.000-05:00\tlatest=2024-01-15T11:00:00.000-05:00
 2024-01-15T11:10:00.000-05:00\tEVENT_STARTED\tuuid-event3\tworkout\t2024-01-15T10:45:00.000-05:00
-2024-01-15T11:30:00.000-05:00\tEVENT_STOPPED\tuuid-event1\twalk
-2024-01-15T11:35:00.000-05:00\tEVENT_STOPPED\tuuid-event2\trun\tearliest=2024-01-15T11:30:00.000-05:00\tlatest=2024-01-15T11:35:00.000-05:00
-2024-01-15T11:40:00.000-05:00\tEVENT_CANCELLED\tuuid-event4\tswim
+2024-01-15T11:30:00.000-05:00\tEVENT_STOPPED\tuuid-event1\twalk\t2024-01-15T11:00:00.000-05:00
+2024-01-15T11:35:00.000-05:00\tEVENT_STOPPED\tuuid-event2\trun\tearliest=2024-01-15T10:55:00.000-05:00\tlatest=2024-01-15T11:00:00.000-05:00\tearliest=2024-01-15T11:25:00.000-05:00\tlatest=2024-01-15T11:35:00.000-05:00
+2024-01-15T11:40:00.000-05:00\tEVENT_STARTED\tuuid-event4\tswim
+2024-01-15T11:41:00.000-05:00\tEVENT_CANCELLED\tuuid-event4\tswim
 2024-01-15T12:00:00.000-05:00\tGLOBAL_NOTE\tUser added a custom note
 2024-01-15T12:05:00.000-05:00\tDEVICE_NOTE\tuuid-123\tMyWatch\tDevice-specific note
 2024-01-15T12:10:00.000-05:00\tACTIVITY_NOTE\tuuid-event1\tWalk\tEvent-specific note
@@ -29,49 +32,41 @@ SAMPLE_LOG = """2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tname="MyW
 """
 
 
+def _ts(s):
+    return pd.Timestamp(s)
+
+
+def _write(tmp_path, content):
+    path = tmp_path / "worn_log.txt"
+    path.write_text(content, encoding="utf-8")
+    return str(path)
+
+
 @pytest.fixture
-def sample_log_file():
-    """Create a temporary log file for testing."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write(SAMPLE_LOG)
-        return f.name
+def df(tmp_path):
+    return parse_log(_write(tmp_path, SAMPLE_LOG))
 
 
-def test_parse_log_returns_dataframe(sample_log_file):
-    """Test that parse_log returns a DataFrame with expected columns."""
-    df = parse_log(sample_log_file)
-
-    assert len(df) == 17  # 17 log entries in sample
-
-    expected_columns = [
-        "log_time",
-        "event_type",
-        "id",
-        "name",
-        "device_type",
-        "status",
-        "location",
-        "serial_number",
-        "power",
-        "event_subtype",
-        "effective_time",
-        "start_time",
-        "start_earliest",
-        "start_latest",
-        "stop_time",
-        "stop_earliest",
-        "stop_latest",
-        "note",
-        "tracking_state",
-    ]
-    assert list(df.columns) == expected_columns
+def _rows(df, event_type):
+    return df[df["event_type"] == event_type]
 
 
-def test_device_added(sample_log_file):
-    """Test DEVICE_ADDED parsing."""
-    df = parse_log(sample_log_file)
-    row = df[df["event_type"] == "DEVICE_ADDED"].iloc[0]
+def test_columns_and_row_count(df):
+    assert len(df) == 18
+    assert list(df.columns) == COLUMNS
 
+
+def test_time_columns_keep_log_offset(df):
+    """With one UTC offset in the log, times stay in that offset."""
+    for col in ["log_time", "start_time", "stop_earliest", "effective_time"]:
+        assert isinstance(df[col].dtype, pd.DatetimeTZDtype)
+    first = df.iloc[0]["log_time"]
+    assert (first.hour, first.minute) == (10, 30)
+    assert first.utcoffset() == pd.Timedelta(hours=-5)
+
+
+def test_device_added(df):
+    row = _rows(df, "DEVICE_ADDED").iloc[0]
     assert row["id"] == "uuid-123"
     assert row["name"] == "MyWatch"
     assert row["device_type"] == "watch"
@@ -81,291 +76,226 @@ def test_device_added(sample_log_file):
     assert row["power"] == "on"
 
 
-def test_device_updated_with_changes(sample_log_file):
-    """Test DEVICE_UPDATED parsing with multiple changes."""
-    df = parse_log(sample_log_file)
-    rows = df[df["event_type"] == "DEVICE_UPDATED"]
-
-    # First update: multiple fields changed
-    row = rows.iloc[0]
-    assert row["name"] == "My Watch Renamed"
+def test_device_updated_with_changes(df):
+    row = _rows(df, "DEVICE_UPDATED").iloc[0]
+    assert row["name"] == "My Watch Renamed"  # new name
     assert row["device_type"] == "wristband"
+    assert row["serial_number"] == "SN456"
     assert row["status"] == "worn"
+    assert row["location"] == "rightWrist"
     assert row["power"] == "off"
 
 
-def test_device_updated_with_effective_time(sample_log_file):
-    """Test DEVICE_UPDATED with backdated effective time (Z suffix)."""
-    df = parse_log(sample_log_file)
-    rows = df[df["event_type"] == "DEVICE_UPDATED"]
+def test_device_updated_only_fills_changed_fields(df):
+    row = _rows(df, "DEVICE_UPDATED").iloc[1]
+    assert row["name"] == "My Watch Renamed"  # old name, from the quoted field
+    assert row["status"] == "loose"
+    assert pd.isna(row["location"])
+    assert pd.isna(row["effective_time"])
 
-    # Fourth entry has effective time with Z suffix
-    row = rows.iloc[2]
+
+def test_device_updated_with_effective_time(df):
+    row = _rows(df, "DEVICE_UPDATED").iloc[2]
     assert row["status"] == "worn"
-    assert row["effective_time"] is not None
-    assert row["effective_time"].year == 2024
-    assert row["effective_time"].month == 1
-    assert row["effective_time"].day == 15
-    assert row["effective_time"].hour == 10
-    assert row["effective_time"].minute == 40
+    assert row["effective_time"] == _ts("2024-01-15T10:40:00-05:00")
 
 
-def test_event_started_no_window(sample_log_file):
-    """Test EVENT_STARTED without time window."""
-    df = parse_log(sample_log_file)
-    rows = df[df["event_type"] == "EVENT_STARTED"]
-    row = rows.iloc[0]
+def test_device_deleted(df):
+    row = _rows(df, "DEVICE_DELETED").iloc[0]
+    assert row["id"] == "uuid-123"
+    assert row["name"] == "My Watch Renamed"
 
+
+def test_event_started_now(df):
+    row = _rows(df, "EVENT_STARTED").iloc[0]
     assert row["id"] == "uuid-event1"
     assert row["event_subtype"] == "walk"
-    assert pd.isna(row["start_earliest"])
-    assert pd.isna(row["start_latest"])
-    assert pd.isna(row["start_time"])
+    for col in ["start_time", "start_earliest", "start_latest"]:
+        assert pd.isna(row[col])
 
 
-def test_event_started_with_window(sample_log_file):
-    """Test EVENT_STARTED with earliest/latest window."""
-    df = parse_log(sample_log_file)
-    rows = df[df["event_type"] == "EVENT_STARTED"]
-    row = rows.iloc[1]
-
-    assert row["id"] == "uuid-event2"
+def test_event_started_with_window(df):
+    row = _rows(df, "EVENT_STARTED").iloc[1]
     assert row["event_subtype"] == "run"
-    assert row["start_earliest"] is not None
-    assert row["start_latest"] is not None
-    assert row["start_earliest"].hour == 11
-    assert row["start_earliest"].minute == 0
-    assert row["start_latest"].hour == 11
-    assert row["start_latest"].minute == 5
+    assert pd.isna(row["start_time"])
+    assert row["start_earliest"] == _ts("2024-01-15T10:55:00-05:00")
+    assert row["start_latest"] == _ts("2024-01-15T11:00:00-05:00")
 
 
-def test_event_started_backdated(sample_log_file):
-    """Test EVENT_STARTED with single backdated timestamp."""
-    df = parse_log(sample_log_file)
-    rows = df[df["event_type"] == "EVENT_STARTED"]
-    row = rows.iloc[2]
-
-    assert row["id"] == "uuid-event3"
+def test_event_started_backdated(df):
+    row = _rows(df, "EVENT_STARTED").iloc[2]
     assert row["event_subtype"] == "workout"
-    assert row["start_time"] is not None
-    assert row["start_time"].hour == 10
-    assert row["start_time"].minute == 45
-
-
-def test_event_stopped_no_window(sample_log_file):
-    """Test EVENT_STOPPED without time window."""
-    df = parse_log(sample_log_file)
-    rows = df[df["event_type"] == "EVENT_STOPPED"]
-    row = rows.iloc[0]
-
-    assert row["id"] == "uuid-event1"
-    assert row["event_subtype"] == "walk"
-    # No start or stop windows
-    assert pd.isna(row["start_time"])
-    assert pd.isna(row["stop_time"])
+    assert row["start_time"] == _ts("2024-01-15T10:45:00-05:00")
     assert pd.isna(row["start_earliest"])
-    assert pd.isna(row["stop_earliest"])
 
 
-def test_event_stopped_with_stop_window(sample_log_file):
-    """Test EVENT_STOPPED with stop time window."""
-    df = parse_log(sample_log_file)
-    rows = df[df["event_type"] == "EVENT_STOPPED"]
-    row = rows.iloc[1]
+def test_event_stopped_start_only(df):
+    """A lone time on EVENT_STOPPED is the start; the stop is log_time."""
+    row = _rows(df, "EVENT_STOPPED").iloc[0]
+    assert row["id"] == "uuid-event1"
+    assert row["start_time"] == _ts("2024-01-15T11:00:00-05:00")
+    for col in ["stop_time", "stop_earliest", "stop_latest"]:
+        assert pd.isna(row[col])
 
+
+def test_event_stopped_with_both_windows(df):
+    row = _rows(df, "EVENT_STOPPED").iloc[1]
     assert row["id"] == "uuid-event2"
-    assert row["event_subtype"] == "run"
-    # This log entry only has a stop window (no start window recorded)
-    assert row["start_earliest"] is not None  # First earliest/latest pair
-    assert row["start_latest"] is not None
+    assert row["start_earliest"] == _ts("2024-01-15T10:55:00-05:00")
+    assert row["start_latest"] == _ts("2024-01-15T11:00:00-05:00")
+    assert row["stop_earliest"] == _ts("2024-01-15T11:25:00-05:00")
+    assert row["stop_latest"] == _ts("2024-01-15T11:35:00-05:00")
 
 
-def test_event_cancelled(sample_log_file):
-    """Test EVENT_CANCELLED parsing."""
-    df = parse_log(sample_log_file)
-    row = df[df["event_type"] == "EVENT_CANCELLED"].iloc[0]
-
+def test_event_cancelled(df):
+    row = _rows(df, "EVENT_CANCELLED").iloc[0]
     assert row["id"] == "uuid-event4"
     assert row["event_subtype"] == "swim"
 
 
-def test_global_note(sample_log_file):
-    """Test GLOBAL_NOTE parsing."""
-    df = parse_log(sample_log_file)
-    row = df[df["event_type"] == "GLOBAL_NOTE"].iloc[0]
+def test_event_retroactive_with_start_and_stop(df):
+    row = _rows(df, "EVENT_RETROACTIVE").iloc[0]
+    assert row["id"] == "uuid-event5"
+    assert row["event_subtype"] == "inBed"
+    assert row["start_time"] == _ts("2024-01-14T22:00:00-05:00")
+    assert row["stop_time"] == _ts("2024-01-15T06:00:00-05:00")
 
-    assert row["id"] is None
+
+def test_notes(df):
+    row = _rows(df, "GLOBAL_NOTE").iloc[0]
+    assert pd.isna(row["id"])
     assert row["note"] == "User added a custom note"
 
-
-def test_device_note(sample_log_file):
-    """Test DEVICE_NOTE parsing."""
-    df = parse_log(sample_log_file)
-    row = df[df["event_type"] == "DEVICE_NOTE"].iloc[0]
-
-    assert row["id"] == "uuid-123"
-    assert row["name"] == "MyWatch"
+    row = _rows(df, "DEVICE_NOTE").iloc[0]
+    assert (row["id"], row["name"]) == ("uuid-123", "MyWatch")
     assert row["note"] == "Device-specific note"
 
-
-def test_activity_note(sample_log_file):
-    """Test ACTIVITY_NOTE parsing."""
-    df = parse_log(sample_log_file)
-    row = df[df["event_type"] == "ACTIVITY_NOTE"].iloc[0]
-
-    assert row["id"] == "uuid-event1"
-    assert row["name"] == "Walk"
+    row = _rows(df, "ACTIVITY_NOTE").iloc[0]
+    assert (row["id"], row["name"]) == ("uuid-event1", "Walk")
     assert row["note"] == "Event-specific note"
 
 
-def test_event_retroactive_with_start_and_stop(sample_log_file):
-    """Test EVENT_RETROACTIVE parsing with both start and stop times.
-
-    EVENT_RETROACTIVE can have both a start window and a stop window.
-    The sample log has two bare timestamps: start time and stop time.
-    """
-    df = parse_log(sample_log_file)
-    row = df[df["event_type"] == "EVENT_RETROACTIVE"].iloc[0]
-
-    assert row["id"] == "uuid-event5"
-    assert row["event_subtype"] == "inBed"
-
-    # Start time: 2024-01-14T22:00:00.000-05:00
-    assert row["start_time"] is not None
-    assert row["start_time"].day == 14
-    assert row["start_time"].hour == 22
-    assert row["start_time"].minute == 0
-
-    # Stop time: 2024-01-15T06:00:00.000-05:00
-    assert row["stop_time"] is not None
-    assert row["stop_time"].day == 15
-    assert row["stop_time"].hour == 6
-    assert row["stop_time"].minute == 0
+def test_global_tracking(df):
+    rows = _rows(df, "GLOBAL_TRACKING")
+    assert list(rows["tracking_state"]) == ["off", "on"]
 
 
-def test_global_tracking(sample_log_file):
-    """Test GLOBAL_TRACKING parsing."""
-    df = parse_log(sample_log_file)
-    rows = df[df["event_type"] == "GLOBAL_TRACKING"]
-
-    assert len(rows) == 2
-    assert rows.iloc[0]["tracking_state"] == "off"
-    assert rows.iloc[1]["tracking_state"] == "on"
-
-
-def test_device_deleted(sample_log_file):
-    """Test DEVICE_DELETED parsing."""
-    df = parse_log(sample_log_file)
-    row = df[df["event_type"] == "DEVICE_DELETED"].iloc[0]
-
-    assert row["id"] == "uuid-123"
-    assert row["name"] == "My Watch Renamed"
-
-
-def test_timestamp_parsing(sample_log_file):
-    """Test that log_time timestamps are parsed correctly."""
-    df = parse_log(sample_log_file)
-
-    # First entry: 2024-01-15T10:30:00.000-05:00
-    first_time = df.iloc[0]["log_time"]
-    assert first_time.year == 2024
-    assert first_time.month == 1
-    assert first_time.day == 15
-    assert first_time.hour == 10
-    assert first_time.minute == 30
-
-
-def test_empty_file():
-    """Test parsing empty file."""
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write("")
-        filepath = f.name
-
-    df = parse_log(filepath)
+def test_empty_file(tmp_path):
+    df = parse_log(_write(tmp_path, ""))
     assert len(df) == 0
+    assert list(df.columns) == COLUMNS
 
 
-def test_serial_number_none():
-    """Test that sn=none is parsed as None."""
-    log_content = '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tname="Watch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=none\tpower=on'
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write(log_content)
-        filepath = f.name
-
-    df = parse_log(filepath)
-    assert df.iloc[0]["serial_number"] is None
+def test_bad_line_reports_line_number(tmp_path):
+    content = "2024-01-15T10:30:00.000-05:00\tGLOBAL_TRACKING\ton\nnot a time\tGLOBAL_TRACKING\toff"
+    with pytest.raises(ValueError, match="line 2"):
+        parse_log(_write(tmp_path, content))
 
 
-def test_z_suffix_timestamp():
-    """Test parsing timestamps with Z suffix (UTC) for Python <3.11 compatibility."""
-    log_content = '2024-01-15T10:30:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"Watch"\tstatus=worn\teffective=2024-01-15T15:30:00.000Z'
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write(log_content)
-        filepath = f.name
-
-    df = parse_log(filepath)
-    row = df.iloc[0]
-    assert row["effective_time"] is not None
-    assert row["effective_time"].hour == 15
-    assert row["effective_time"].minute == 30
+def test_serial_number_none(tmp_path):
+    line = '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tname="Watch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=none\tpower=on'
+    df = parse_log(_write(tmp_path, line))
+    assert pd.isna(df.iloc[0]["serial_number"])
 
 
-def test_event_stopped_with_both_windows():
-    """Test EVENT_STOPPED with both start and stop uncertainty windows."""
-    log_content = (
-        "2024-01-15T12:00:00.000-05:00\tEVENT_STOPPED\tuuid-123\trun\t"
-        "earliest=2024-01-15T10:00:00.000-05:00\tlatest=2024-01-15T10:05:00.000-05:00\t"
-        "earliest=2024-01-15T11:55:00.000-05:00\tlatest=2024-01-15T12:00:00.000-05:00"
+def test_names_with_quotes_and_equals(tmp_path):
+    lines = [
+        '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-1\tname="My "Best" Watch=1"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=none\tpower=on',
+        '2024-01-15T10:31:00.000-05:00\tDEVICE_DELETED\tuuid-1\t"My "Best" Watch=1"',
+    ]
+    df = parse_log(_write(tmp_path, "\n".join(lines)))
+    assert list(df["name"]) == ['My "Best" Watch=1'] * 2
+
+
+def test_z_suffix_timestamp(tmp_path):
+    """Older logs wrote effective= in UTC with a Z suffix."""
+    line = '2024-01-15T10:30:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"Watch"\tstatus=worn\teffective=2024-01-15T15:20:00.000Z'
+    df = parse_log(_write(tmp_path, line))
+    effective = df.iloc[0]["effective_time"]
+    assert effective == _ts("2024-01-15T15:20:00Z")
+    # Shown in the log's own offset, like every other time column
+    assert (effective.hour, effective.minute) == (10, 20)
+
+
+def test_event_stopped_precise_start_and_stop_window(tmp_path):
+    """Regression: the stop window used to land in the start_* columns."""
+    line = (
+        "2024-01-15T12:00:00.000-05:00\tEVENT_STOPPED\tuuid-1\trun\t"
+        "2024-01-15T10:00:00.000-05:00\t"
+        "earliest=2024-01-15T11:50:00.000-05:00\tlatest=2024-01-15T12:00:00.000-05:00"
     )
-
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write(log_content)
-        filepath = f.name
-
-    df = parse_log(filepath)
-    row = df.iloc[0]
-
-    # Start window
-    assert row["start_earliest"].hour == 10
-    assert row["start_earliest"].minute == 0
-    assert row["start_latest"].hour == 10
-    assert row["start_latest"].minute == 5
-
-    # Stop window
-    assert row["stop_earliest"].hour == 11
-    assert row["stop_earliest"].minute == 55
-    assert row["stop_latest"].hour == 12
-    assert row["stop_latest"].minute == 0
+    row = parse_log(_write(tmp_path, line)).iloc[0]
+    assert row["start_time"] == _ts("2024-01-15T10:00:00-05:00")
+    assert pd.isna(row["start_earliest"]) and pd.isna(row["start_latest"])
+    assert pd.isna(row["stop_time"])
+    assert row["stop_earliest"] == _ts("2024-01-15T11:50:00-05:00")
+    assert row["stop_latest"] == _ts("2024-01-15T12:00:00-05:00")
 
 
-def test_event_retroactive_with_windows():
-    """Test EVENT_RETROACTIVE with earliest/latest windows for both start and stop."""
-    log_content = (
-        "2024-01-15T12:00:00.000-05:00\tEVENT_RETROACTIVE\tuuid-123\tinBed\t"
+def test_event_stopped_start_window_and_precise_stop(tmp_path):
+    """Regression: the precise stop time used to land in start_time."""
+    line = (
+        "2024-01-15T12:00:00.000-05:00\tEVENT_STOPPED\tuuid-1\trun\t"
+        "earliest=2024-01-15T10:00:00.000-05:00\tlatest=2024-01-15T10:05:00.000-05:00\t"
+        "2024-01-15T11:30:00.000-05:00"
+    )
+    row = parse_log(_write(tmp_path, line)).iloc[0]
+    assert pd.isna(row["start_time"])
+    assert row["start_earliest"] == _ts("2024-01-15T10:00:00-05:00")
+    assert row["start_latest"] == _ts("2024-01-15T10:05:00-05:00")
+    assert row["stop_time"] == _ts("2024-01-15T11:30:00-05:00")
+    assert pd.isna(row["stop_earliest"]) and pd.isna(row["stop_latest"])
+
+
+def test_event_retroactive_with_windows(tmp_path):
+    line = (
+        "2024-01-15T12:00:00.000-05:00\tEVENT_RETROACTIVE\tuuid-1\tinBed\t"
         "earliest=2024-01-14T22:00:00.000-05:00\tlatest=2024-01-14T22:30:00.000-05:00\t"
         "earliest=2024-01-15T06:00:00.000-05:00\tlatest=2024-01-15T06:30:00.000-05:00"
     )
+    row = parse_log(_write(tmp_path, line)).iloc[0]
+    assert row["start_earliest"] == _ts("2024-01-14T22:00:00-05:00")
+    assert row["start_latest"] == _ts("2024-01-14T22:30:00-05:00")
+    assert row["stop_earliest"] == _ts("2024-01-15T06:00:00-05:00")
+    assert row["stop_latest"] == _ts("2024-01-15T06:30:00-05:00")
 
-    with tempfile.NamedTemporaryFile(mode="w", suffix=".txt", delete=False) as f:
-        f.write(log_content)
-        filepath = f.name
 
-    df = parse_log(filepath)
-    row = df.iloc[0]
+# A log spanning the US spring-forward change (CST -06:00 -> CDT -05:00)
+DST_LOG = """\
+2024-03-09T22:00:00.000-06:00\tEVENT_STARTED\tuuid-1\tinBed
+2024-03-10T07:00:00.000-05:00\tEVENT_STOPPED\tuuid-1\tinBed\t2024-03-09T22:00:00.000-06:00
+"""
 
-    # Start window (bedtime uncertainty)
-    assert row["start_earliest"].day == 14
-    assert row["start_earliest"].hour == 22
-    assert row["start_latest"].hour == 22
-    assert row["start_latest"].minute == 30
 
-    # Stop window (wake time uncertainty)
-    assert row["stop_earliest"].day == 15
-    assert row["stop_earliest"].hour == 6
-    assert row["stop_latest"].hour == 6
-    assert row["stop_latest"].minute == 30
+def test_mixed_offsets_convert_to_utc_with_warning(tmp_path):
+    with pytest.warns(UserWarning, match="more than one UTC offset"):
+        df = parse_log(_write(tmp_path, DST_LOG))
+    assert str(df["log_time"].dt.tz) == "UTC"
+    assert df.iloc[1]["log_time"] == _ts("2024-03-10T12:00:00Z")
+    assert df.iloc[1]["start_time"] == _ts("2024-03-10T04:00:00Z")
+
+
+def test_tz_argument_converts_all_times(tmp_path):
+    df = parse_log(_write(tmp_path, DST_LOG), tz="America/Chicago")
+    assert str(df["log_time"].dt.tz) == "America/Chicago"
+    stop = df.iloc[1]
+    assert (stop["log_time"].hour, stop["start_time"].hour) == (7, 22)
+    # Durations are correct across the DST change: 22:00 CST -> 07:00 CDT
+    assert stop["log_time"] - stop["start_time"] == pd.Timedelta(hours=8)
+
+
+def test_cli_summary_and_csv(tmp_path, capsys):
+    log_file = _write(tmp_path, SAMPLE_LOG)
+    csv_file = tmp_path / "parsed.csv"
+    main([log_file, "--csv", str(csv_file)])
+
+    out = capsys.readouterr().out
+    assert "Parsed 18 log entries" in out
+    assert "EVENT_STARTED" in out
+
+    csv = pd.read_csv(csv_file)
+    assert list(csv.columns) == COLUMNS
+    assert len(csv) == 18
 
 
 if __name__ == "__main__":
