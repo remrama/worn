@@ -57,8 +57,28 @@ class Device {
   final DeviceType deviceType;
   final DeviceStatus status;
   final DeviceLocation location;
+  final String? make;
+  final String? model;
   final String? serialNumber;
   final bool isPoweredOn;
+
+  /// Manufacturers suggested in the device dialog. Any other text is allowed.
+  static const List<String> makePresets = [
+    'ActiGraph',
+    'Apple',
+    'Axivity',
+    'Empatica',
+    'Fitbit',
+    'Garmin',
+    'GENEActiv',
+    'Google',
+    'Muse',
+    'Oura',
+    'Polar',
+    'Samsung',
+    'Whoop',
+    'Withings',
+  ];
 
   Device({
     String? id,
@@ -66,6 +86,8 @@ class Device {
     this.deviceType = DeviceType.watch,
     this.status = DeviceStatus.loose,
     DeviceLocation? location,
+    this.make,
+    this.model,
     this.serialNumber,
     this.isPoweredOn = true,
   })  : id = id ?? const Uuid().v4(),
@@ -76,6 +98,8 @@ class Device {
     DeviceType? deviceType,
     DeviceStatus? status,
     DeviceLocation? location,
+    String? make,
+    String? model,
     String? serialNumber,
     bool? isPoweredOn,
   }) {
@@ -85,6 +109,8 @@ class Device {
       deviceType: deviceType ?? this.deviceType,
       status: status ?? this.status,
       location: location ?? this.location,
+      make: make ?? this.make,
+      model: model ?? this.model,
       serialNumber: serialNumber ?? this.serialNumber,
       isPoweredOn: isPoweredOn ?? this.isPoweredOn,
     );
@@ -97,6 +123,8 @@ class Device {
       'deviceType': deviceType.name,
       'status': status.name,
       'location': location.name,
+      'make': make,
+      'model': model,
       'serialNumber': serialNumber,
       'isPoweredOn': isPoweredOn,
     };
@@ -111,6 +139,8 @@ class Device {
       deviceType: deviceType,
       status: parsed.$1,
       location: parsed.$2,
+      make: map['make'],
+      model: map['model'],
       serialNumber: map['serialNumber'],
       isPoweredOn: map['isPoweredOn'] ?? true,
     );
@@ -172,6 +202,13 @@ class Device {
     }
 
     return (DeviceStatus.loose, defaultLocationFor(deviceType));
+  }
+
+  /// Make and model joined for display, e.g. "Garmin Venu 3", or null if
+  /// neither is set.
+  String? get makeModel {
+    final parts = [make, model].whereType<String>();
+    return parts.isEmpty ? null : parts.join(' ');
   }
 
   /// Whether the device is currently being worn (on a body part)

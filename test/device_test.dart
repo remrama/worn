@@ -12,6 +12,9 @@ void main() {
       expect(device.status, DeviceStatus.loose);
       expect(device.location, DeviceLocation.leftWrist); // Default for watch
       expect(device.serialNumber, isNull);
+      expect(device.make, isNull);
+      expect(device.model, isNull);
+      expect(device.makeModel, isNull);
       expect(device.id, isNotEmpty);
       expect(device.isPoweredOn, true);
     });
@@ -51,6 +54,26 @@ void main() {
       expect(updated.isPoweredOn, false);
     });
 
+    test('makeModel joins whichever of make and model are set', () {
+      expect(Device(name: 'a', make: 'Garmin', model: 'Venu 3').makeModel,
+          'Garmin Venu 3');
+      expect(Device(name: 'b', make: 'Garmin').makeModel, 'Garmin');
+      expect(Device(name: 'c', model: 'Venu 3').makeModel, 'Venu 3');
+    });
+
+    test('fromMap without make and model leaves them null', () {
+      final device = Device.fromMap({
+        'id': 'old',
+        'name': 'Old',
+        'deviceType': 'watch',
+        'status': 'loose',
+        'location': 'leftWrist',
+        'serialNumber': null,
+      });
+      expect(device.make, isNull);
+      expect(device.model, isNull);
+    });
+
     test('copyWith can change isPoweredOn', () {
       final device = Device(name: 'Test', isPoweredOn: true);
       final updated = device.copyWith(isPoweredOn: false);
@@ -65,6 +88,8 @@ void main() {
         name: 'Roundtrip',
         status: DeviceStatus.worn,
         location: DeviceLocation.leftIndexFinger,
+        make: 'Oura',
+        model: 'Gen 3',
         serialNumber: 'ABC',
         isPoweredOn: false,
         deviceType: DeviceType.ring,
@@ -77,6 +102,8 @@ void main() {
       expect(restored.name, device.name);
       expect(restored.status, device.status);
       expect(restored.location, device.location);
+      expect(restored.make, 'Oura');
+      expect(restored.model, 'Gen 3');
       expect(restored.serialNumber, device.serialNumber);
       expect(restored.deviceType, device.deviceType);
       expect(restored.isPoweredOn, device.isPoweredOn);

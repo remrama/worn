@@ -35,6 +35,8 @@ COLUMNS = [
     "device_type",
     "status",
     "location",
+    "make",
+    "model",
     "serial_number",
     "power",
     "event_subtype",
@@ -62,10 +64,12 @@ TIME_COLUMNS = [
 
 # key=value fields on DEVICE_* entries and the column each one fills
 _DEVICE_FIELDS = {
-    "name": "name",
+    "nickname": "name",
     "type": "device_type",
     "status": "status",
     "location": "location",
+    "make": "make",
+    "model": "model",
     "sn": "serial_number",
     "power": "power",
 }
@@ -98,7 +102,9 @@ def _parse_device_fields(fields: list[str]) -> dict:
         if key in _DEVICE_FIELDS:
             value = _unquote(value)
             if key == "sn" and value == "none":
-                value = None
+                # Blank (or cleared) is "", distinct from missing (NaN),
+                # which on DEVICE_UPDATED means the field did not change.
+                value = ""
             result[_DEVICE_FIELDS[key]] = value
         elif key == "effective":
             result["effective_time"] = _parse_timestamp(value)
@@ -235,10 +241,11 @@ def parse_log(filepath: str, tz: str | None = None) -> pd.DataFrame:
         - log_time: When the entry was written
         - event_type: Entry type (DEVICE_ADDED, EVENT_STARTED, ...)
         - id: Device or event UUID
-        - name: Device name (DEVICE_*), event name (ACTIVITY_NOTE), or
+        - name: Device nickname (DEVICE_*), event name (ACTIVITY_NOTE), or
           custom name of an `other` event (EVENT_*)
-        - device_type, status, location, serial_number, power: Device
-          properties (DEVICE_UPDATED only fills the ones that changed)
+        - device_type, status, location, make, model, serial_number, power: Device
+          properties (DEVICE_UPDATED only fills the ones that changed). A
+          blank or cleared make, model or serial_number is "", not missing.
         - event_subtype: Event type for EVENT_* (walk, run, inBed, ...)
         - effective_time: Backdated time of a DEVICE_UPDATED change
         - start_time / stop_time: Precise backdated start / stop time

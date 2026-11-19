@@ -11,8 +11,8 @@ from parse_log import COLUMNS, main, parse_log
 
 # A realistic log covering every entry type, as the current app writes it
 SAMPLE_LOG = """\
-2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tname="MyWatch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=SN123\tpower=on
-2024-01-15T10:32:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"MyWatch"\tname="My Watch Renamed"\ttype=wristband\tsn=SN456\tstatus=worn\tlocation=rightWrist\tpower=off
+2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tnickname="MyWatch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tmake="Garmin"\tmodel="Venu 3"\tsn=SN123\tpower=on
+2024-01-15T10:32:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"MyWatch"\tnickname="My Watch Renamed"\ttype=wristband\tsn=SN456\tstatus=worn\tlocation=rightWrist\tmodel="Venu 3S"\tpower=off
 2024-01-15T10:45:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"My Watch Renamed"\tstatus=loose
 2024-01-15T10:50:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"My Watch Renamed"\tstatus=worn\teffective=2024-01-15T10:40:00.000-05:00
 2024-01-15T11:00:00.000-05:00\tEVENT_STARTED\tuuid-event1\twalk
@@ -72,6 +72,8 @@ def test_device_added(df):
     assert row["device_type"] == "watch"
     assert row["status"] == "loose"
     assert row["location"] == "leftWrist"
+    assert row["make"] == "Garmin"
+    assert row["model"] == "Venu 3"
     assert row["serial_number"] == "SN123"
     assert row["power"] == "on"
 
@@ -80,6 +82,8 @@ def test_device_updated_with_changes(df):
     row = _rows(df, "DEVICE_UPDATED").iloc[0]
     assert row["name"] == "My Watch Renamed"  # new name
     assert row["device_type"] == "wristband"
+    assert pd.isna(row["make"])  # unchanged, so not written
+    assert row["model"] == "Venu 3S"
     assert row["serial_number"] == "SN456"
     assert row["status"] == "worn"
     assert row["location"] == "rightWrist"
@@ -193,14 +197,47 @@ def test_bad_line_reports_line_number(tmp_path):
 
 
 def test_serial_number_none(tmp_path):
-    line = '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tname="Watch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=none\tpower=on'
+    line = '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tnickname="Watch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=none\tpower=on'
     df = parse_log(_write(tmp_path, line))
-    assert pd.isna(df.iloc[0]["serial_number"])
+    assert df.iloc[0]["serial_number"] == ""
+
+
+def test_blank_make_and_model(tmp_path):
+    lines = [
+        '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tnickname="Watch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tmake=""\tmodel=""\tsn=none\tpower=on',
+        '2024-01-15T10:31:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"Watch"\tmake=""',
+    ]
+    df = parse_log(_write(tmp_path, "\n".join(lines)))
+    assert list(df["make"]) == ["", ""]
+    assert df.iloc[0]["model"] == ""
+
+
+def test_cleared_field_differs_from_unchanged(tmp_path):
+    """A cleared make is "", an unchanged one is NaN, so ffill keeps the clear."""
+    lines = [
+        '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tnickname="Watch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tmake="Garmin"\tmodel="Venu 3"\tsn=SN1\tpower=on',
+        '2024-01-15T10:31:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"Watch"\tmake=""\tsn=none',
+        '2024-01-15T10:32:00.000-05:00\tDEVICE_UPDATED\tuuid-123\t"Watch"\tstatus=worn',
+    ]
+    df = parse_log(_write(tmp_path, "\n".join(lines)))
+    cleared, unchanged = df.iloc[1], df.iloc[2]
+    assert (cleared["make"], cleared["serial_number"]) == ("", "")
+    assert pd.isna(cleared["model"])
+    assert pd.isna(unchanged["make"]) and pd.isna(unchanged["serial_number"])
+    filled = df[["make", "model", "serial_number"]].ffill().iloc[2]
+    assert list(filled) == ["", "Venu 3", ""]
+
+
+def test_older_logs_without_make_and_model(tmp_path):
+    line = '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-123\tnickname="Watch"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=none\tpower=on'
+    df = parse_log(_write(tmp_path, line))
+    assert pd.isna(df.iloc[0]["make"])
+    assert pd.isna(df.iloc[0]["model"])
 
 
 def test_names_with_quotes_and_equals(tmp_path):
     lines = [
-        '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-1\tname="My "Best" Watch=1"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=none\tpower=on',
+        '2024-01-15T10:30:00.000-05:00\tDEVICE_ADDED\tuuid-1\tnickname="My "Best" Watch=1"\ttype=watch\tstatus=loose\tlocation=leftWrist\tsn=none\tpower=on',
         '2024-01-15T10:31:00.000-05:00\tDEVICE_DELETED\tuuid-1\t"My "Best" Watch=1"',
     ]
     df = parse_log(_write(tmp_path, "\n".join(lines)))
