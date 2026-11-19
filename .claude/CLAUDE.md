@@ -87,6 +87,7 @@ dart run flutter_launcher_icons
 ## Directory Structure
 
 ```
+docs/                      # GitHub Pages site (static index.html + style.css)
 lib/
 ├── main.dart              # App entry point & 2-tab navigation (Logs, History)
 ├── models/
@@ -144,6 +145,8 @@ Tab-separated entries. Every timestamp (log time, event times, `effective=`) is 
 Event times are positional: start first, then stop. `EVENT_STOPPED` and `EVENT_RETROACTIVE` always write the start time when they write a stop time, so a lone time is always the start. Custom-named `other` events write `name="<customName>"` right after the event type on every `EVENT_*` line (before any times); other event types never write `name=`. `DEVICE_UPDATED` writes only changed fields, plus `effective=` when backdated.
 
 The README's "Log Format" and "Parsing the Log" sections are the user-facing spec, and `scripts/parse_log.py` parses it. Keep all three in sync with `LogService` when the format changes.
+
+The website (`docs/index.html`, served by GitHub Pages from `main:/docs`, no build step) repeats the README's example log and interval snippet and walks through the app's gestures. Update it when the log format, the example, or UI interactions (buttons, long-presses, dialogs) change.
 
 Uses internal variable names for parsing efficiency:
 ```
