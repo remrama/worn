@@ -63,6 +63,8 @@ dart run flutter_launcher_icons
 - **deploy-web-preview.yml**: Web preview deployments for all PRs to main
 - **release.yml**: Production release pipeline triggered by version tags (v*.*.*)
 
+**Flutter version:** All workflows pin Flutter `3.38.7` (`flutter-version` in each `subosito/flutter-action` step). Bump every workflow together when upgrading. Flutter 3.50 deprecates `package:flutter/material.dart` and makes `IconData` final, which breaks `font_awesome_flutter` 10.x.
+
 **Note:** Icon generation (`dart run flutter_launcher_icons`) is NOT required in CI workflows. The generated icon files are already committed to the repository and used automatically during builds. Only run this command locally when updating the source icon image.
 
 ## Architecture
@@ -100,7 +102,8 @@ lib/
 │   ├── log_service.dart   # Event logging (singleton)
 │   ├── notification_service.dart  # Persistent notification for active events (singleton)
 │   └── tracking_service.dart  # Tracking state persistence (singleton, defaults to paused)
-└── widgets/               # Custom reusable widgets
+└── widgets/
+    └── device_type_icon.dart  # Device type icon, sizes Font Awesome glyphs to match Material
 ```
 
 ## Data Persistence
@@ -162,3 +165,4 @@ Uses internal variable names for parsing efficiency:
 - Unit tests in `test/event_test.dart` for Event model
 - Unit tests in `test/event_template_test.dart` for EventTemplate model
 - Widget tests in `test/widget_test.dart` for navigation UI
+- Widget tests in `test/device_type_icon_test.dart` for device type icon sizing
