@@ -58,7 +58,7 @@ dart run flutter_launcher_icons
 
 ## CI/CD Workflows
 
-- **test.yml**: Runs tests and analyze on all pushes to main and PRs (fast gate)
+- **test.yml**: Runs Flutter tests and analyze, plus the Python log parser tests, on all pushes to main and PRs (fast gate)
 - **build-android.yml**: Development APK builds on pushes to main
 - **deploy-web-preview.yml**: Web preview deployments for all PRs to main
 - **release.yml**: Production release pipeline triggered by version tags (v*.*.*)
@@ -171,4 +171,4 @@ Uses internal variable names for parsing efficiency:
 - Unit tests in `test/event_template_test.dart` for EventTemplate model
 - Widget tests in `test/widget_test.dart` for navigation UI
 - Log format tests in `test/log_service_test.dart`
-- Python parser tests in `scripts/test_parse_log.py` (not run in CI): `uv run --with-requirements scripts/requirements.txt pytest scripts`
+- Python parser tests in `scripts/test_parse_log.py`: `uv run --with-requirements scripts/requirements.txt pytest scripts`
