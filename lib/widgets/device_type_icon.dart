@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import '../models/device.dart';
 
 /// Renders the icon for a [DeviceType] in a square of [size].

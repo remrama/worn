@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:uuid/uuid.dart';
 
@@ -226,15 +226,15 @@ class Device {
       case DeviceType.watch:
         return Icons.watch;
       case DeviceType.ring:
-        return FontAwesomeIcons.ring;
+        return FontAwesomeIcons.ring.data;
       case DeviceType.wristband:
         return Icons.watch_outlined;
       case DeviceType.armband:
-        return FontAwesomeIcons.handFist;
+        return FontAwesomeIcons.handFist.data;
       case DeviceType.chestStrap:
-        return FontAwesomeIcons.heartPulse;
+        return FontAwesomeIcons.heartPulse.data;
       case DeviceType.headband:
-        return FontAwesomeIcons.brain;
+        return FontAwesomeIcons.brain.data;
       case DeviceType.other:
         return Icons.devices_other;
     }

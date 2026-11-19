@@ -7,9 +7,8 @@ Future<void> shareLogAsFile(String content) async {
   final tempDir = await getTemporaryDirectory();
   final file = File('${tempDir.path}/worn_log.txt');
   await file.writeAsString(content);
-  await Share.shareXFiles(
-    [XFile(file.path)],
-    subject: 'Worn Log Export',
+  await SharePlus.instance.share(
+    ShareParams(files: [XFile(file.path)], subject: 'Worn Log Export'),
   );
 }
 
