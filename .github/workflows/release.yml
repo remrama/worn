@@ -44,7 +44,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.38.7'
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Get dependencies
@@ -73,7 +73,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.38.7'
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Get dependencies
@@ -100,7 +100,7 @@ jobs:
         uses: subosito/flutter-action@v2
         with:
           channel: 'stable'
-          flutter-version: '3.38.7'
+          flutter-version: '3.50.0'
           cache: true
 
       - name: Get dependencies
