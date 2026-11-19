@@ -106,8 +106,33 @@ class LogService {
     );
   }
 
+  /// Replaces tabs and newlines, which would break the line format, with spaces.
+  String _sanitize(String text) =>
+      text.replaceAll('\t', ' ').replaceAll('\n', ' ');
+
+  /// The leading fields shared by every EVENT_* entry: log time, entry type,
+  /// event ID, event type, and `name="…"` for custom-named `other` events.
+  ///
+  /// The name sits right after the type so the time specs that follow stay
+  /// positional (start first, then stop).
+  List<String> _eventFields(String entryType, Event event, DateTime logTime) {
+    final fields = [
+      _formatDateTime(logTime),
+      entryType,
+      event.id,
+      event.type.name,
+    ];
+    final customName = event.customName;
+    if (event.type == EventType.other &&
+        customName != null &&
+        customName.isNotEmpty) {
+      fields.add('name="${_sanitize(customName)}"');
+    }
+    return fields;
+  }
+
   Future<void> logNote(String note, {Device? device, Event? event}) async {
-    final sanitized = note.replaceAll('\t', ' ').replaceAll('\n', ' ');
+    final sanitized = _sanitize(note);
     if (device != null) {
       await _append(
           '${_timestamp()}\tDEVICE_NOTE\t${device.id}\t${device.name}\t$sanitized');
@@ -147,12 +172,7 @@ class LogService {
     final now = DateTime.now();
     final startWindow =
         _formatTimeWindow(event.startEarliest, event.startLatest, now);
-    final parts = [
-      _formatDateTime(now),
-      'EVENT_STARTED',
-      event.id,
-      event.type.name,
-    ];
+    final parts = _eventFields('EVENT_STARTED', event, now);
     if (startWindow != null) {
       parts.add(startWindow);
     }
@@ -186,12 +206,7 @@ class LogService {
       now,
       alwaysInclude: stopWindow != null,
     );
-    final parts = [
-      _formatDateTime(now),
-      entryType,
-      event.id,
-      event.type.name,
-    ];
+    final parts = _eventFields(entryType, event, now);
     if (startWindow != null) {
       parts.add(startWindow);
     }
@@ -203,7 +218,7 @@ class LogService {
 
   Future<void> logEventCancelled(Event event) async {
     await _append(
-      '${_timestamp()}\tEVENT_CANCELLED\t${event.id}\t${event.type.name}',
+      _eventFields('EVENT_CANCELLED', event, DateTime.now()).join('\t'),
     );
   }
 

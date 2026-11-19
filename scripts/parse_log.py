@@ -132,6 +132,21 @@ def _parse_time_specs(fields: list[str]) -> list[tuple]:
     return [tuple(spec) for spec in specs]
 
 
+def _parse_event_head(row: dict, rest: list[str]) -> list[str]:
+    """Fill id, event_subtype and name from the leading fields of an EVENT_* entry.
+
+    Custom-named `other` events carry name="..." right after the event type.
+    Returns the fields after it, which are the time specs.
+    """
+    row["id"] = rest[0]
+    row["event_subtype"] = rest[1]
+    rest = rest[2:]
+    if rest and rest[0].startswith("name="):
+        row["name"] = _unquote(rest[0][len("name=") :])
+        rest = rest[1:]
+    return rest
+
+
 def _time_columns(specs: list[tuple], prefixes: list[str]) -> dict:
     """Map positional time specs onto start_*/stop_* columns."""
     result = {}
@@ -172,14 +187,12 @@ def _parse_line(fields: list[str]) -> dict:
         row["note"] = rest[0] if rest else None
 
     elif entry in ("EVENT_STARTED", "EVENT_STOPPED", "EVENT_RETROACTIVE"):
-        row["id"] = rest[0]
-        row["event_subtype"] = rest[1]
+        time_fields = _parse_event_head(row, rest)
         prefixes = ["start"] if entry == "EVENT_STARTED" else ["start", "stop"]
-        row.update(_time_columns(_parse_time_specs(rest[2:]), prefixes))
+        row.update(_time_columns(_parse_time_specs(time_fields), prefixes))
 
     elif entry == "EVENT_CANCELLED":
-        row["id"] = rest[0]
-        row["event_subtype"] = rest[1]
+        _parse_event_head(row, rest)
 
     elif entry == "GLOBAL_TRACKING":
         row["tracking_state"] = rest[0]
@@ -222,7 +235,8 @@ def parse_log(filepath: str, tz: str | None = None) -> pd.DataFrame:
         - log_time: When the entry was written
         - event_type: Entry type (DEVICE_ADDED, EVENT_STARTED, ...)
         - id: Device or event UUID
-        - name: Device name (DEVICE_*), or event name (ACTIVITY_NOTE)
+        - name: Device name (DEVICE_*), event name (ACTIVITY_NOTE), or
+          custom name of an `other` event (EVENT_*)
         - device_type, status, location, serial_number, power: Device
           properties (DEVICE_UPDATED only fills the ones that changed)
         - event_subtype: Event type for EVENT_* (walk, run, inBed, ...)

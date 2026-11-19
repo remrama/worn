@@ -456,6 +456,162 @@ void main() {
     });
   });
 
+  group('LogService custom event names', () {
+    setUp(() async {
+      SharedPreferences.setMockInitialValues({});
+      LogService.resetForTesting();
+    });
+
+    Event nap({DateTime? start, DateTime? startLatest}) => Event(
+          id: 'nap-id',
+          type: EventType.other,
+          customName: 'Nap',
+          startEarliest: start,
+          startLatest: startLatest,
+        );
+
+    Future<List<String>> lastFields() async =>
+        (await LogService.instance.getLogLines()).last.split('\t');
+
+    test('logEventStarted writes name after the type', () async {
+      await LogService.instance.logEventStarted(nap());
+
+      final fields = await lastFields();
+      // timestamp, EVENT_STARTED, id, type, name
+      expect(fields.length, 5);
+      expect(fields.sublist(1),
+          ['EVENT_STARTED', 'nap-id', 'other', 'name="Nap"']);
+    });
+
+    test('logEventStarted writes the start window after the name', () async {
+      await LogService.instance.logEventStarted(nap(
+        start: DateTime.utc(2024, 1, 15, 13, 0),
+        startLatest: DateTime.utc(2024, 1, 15, 13, 15),
+      ));
+
+      final fields = await lastFields();
+      expect(fields.length, 7);
+      expect(fields[3], 'other');
+      expect(fields[4], 'name="Nap"');
+      expect(fields[5], startsWith('earliest='));
+      expect(fields[6], startsWith('latest='));
+    });
+
+    test('logEventStopped writes name, then start, then stop', () async {
+      await LogService.instance.logEventStopped(
+        nap(start: DateTime.utc(2024, 1, 15, 13, 0)),
+        DateTime.utc(2024, 1, 15, 14, 0),
+        DateTime.utc(2024, 1, 15, 14, 15),
+      );
+
+      final fields = await lastFields();
+      // timestamp, EVENT_STOPPED, id, type, name, start, stop earliest,
+      // stop latest
+      expect(fields.length, 8);
+      expect(fields[1], 'EVENT_STOPPED');
+      expect(fields[4], 'name="Nap"');
+      expect(
+          DateTime.parse(fields[5])
+              .isAtSameMomentAs(DateTime.utc(2024, 1, 15, 13, 0)),
+          isTrue);
+      expect(fields[6], startsWith('earliest='));
+      expect(fields[7], startsWith('latest='));
+    });
+
+    test('logRetroactiveEvent writes name, then start, then stop', () async {
+      await LogService.instance.logRetroactiveEvent(
+        nap(start: DateTime.utc(2024, 1, 15, 13, 0)),
+        DateTime.utc(2024, 1, 15, 14, 0),
+        DateTime.utc(2024, 1, 15, 14, 0),
+      );
+
+      final fields = await lastFields();
+      // timestamp, EVENT_RETROACTIVE, id, type, name, start, stop
+      expect(fields.length, 7);
+      expect(fields[1], 'EVENT_RETROACTIVE');
+      expect(fields[4], 'name="Nap"');
+      expect(
+          DateTime.parse(fields[5])
+              .isAtSameMomentAs(DateTime.utc(2024, 1, 15, 13, 0)),
+          isTrue);
+      expect(
+          DateTime.parse(fields[6])
+              .isAtSameMomentAs(DateTime.utc(2024, 1, 15, 14, 0)),
+          isTrue);
+    });
+
+    test('logEventCancelled writes name after the type', () async {
+      await LogService.instance.logEventCancelled(nap());
+
+      final fields = await lastFields();
+      expect(fields.sublist(1),
+          ['EVENT_CANCELLED', 'nap-id', 'other', 'name="Nap"']);
+    });
+
+    test('different custom events are told apart', () async {
+      final meditate = Event(type: EventType.other, customName: 'Meditate');
+
+      await LogService.instance.logEventStarted(nap());
+      await LogService.instance.logEventStarted(meditate);
+
+      final lines = await LogService.instance.getLogLines();
+      expect(lines[0], endsWith('\tother\tname="Nap"'));
+      expect(lines[1], endsWith('\tother\tname="Meditate"'));
+    });
+
+    test('name replaces tabs and newlines with spaces', () async {
+      await LogService.instance.logEventStarted(
+          Event(type: EventType.other, customName: 'Power\tnap\nat noon'));
+
+      final fields = await lastFields();
+      expect(fields.length, 5);
+      expect(fields[4], 'name="Power nap at noon"');
+    });
+
+    test('other events without a custom name write no name field', () async {
+      final service = LogService.instance;
+      final event = Event(type: EventType.other);
+
+      await service.logEventStarted(event);
+      await service.logEventStopped(
+          event, event.startEarliest, event.startLatest);
+      await service.logRetroactiveEvent(
+          event, event.startEarliest, event.startLatest);
+      await service.logEventCancelled(event);
+
+      for (final line in await service.getLogLines()) {
+        expect(line, isNot(contains('name=')));
+        expect(line, endsWith('\tother'));
+      }
+    });
+
+    test('non-other events are unchanged, even with a stray custom name',
+        () async {
+      final service = LogService.instance;
+      final now = DateTime.now().toUtc();
+      final event = Event(
+        id: 'walk-id',
+        type: EventType.walk,
+        customName: 'Ignored',
+        startEarliest: now,
+        startLatest: now,
+      );
+
+      await service.logEventStarted(event);
+      await service.logEventStopped(event, now, now);
+      await service.logRetroactiveEvent(event, now, now);
+      await service.logEventCancelled(event);
+
+      final lines = await service.getLogLines();
+      expect(lines.map((l) => l.split('\t').sublist(1)).toList(), [
+        ['EVENT_STARTED', 'walk-id', 'walk'],
+        ['EVENT_STOPPED', 'walk-id', 'walk'],
+        ['EVENT_RETROACTIVE', 'walk-id', 'walk'],
+        ['EVENT_CANCELLED', 'walk-id', 'walk'],
+      ]);
+    });
+  });
+
   group('LogService note entry types', () {
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
