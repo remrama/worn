@@ -1,309 +1,288 @@
 #!/usr/bin/env python3
+# /// script
+# requires-python = ">=3.9"
+# dependencies = ["pandas>=2.0"]
+# ///
 """
-Parse Worn app log files into pandas DataFrames for analysis.
+Parse a Worn log export into a pandas DataFrame, one row per log entry.
 
-Usage:
+Command line (uv installs pandas on the fly):
+    uv run scripts/parse_log.py worn_log.txt
+    uv run scripts/parse_log.py worn_log.txt --csv worn_log.csv
+    uv run scripts/parse_log.py worn_log.txt --tz America/Chicago
+
+Python:
     from parse_log import parse_log
-    df = parse_log("path/to/exported_log.txt")
+    df = parse_log("worn_log.txt")
 
-Requires Python 3.9+ for type hints. Compatible with Python <3.11 by
-handling 'Z' suffix in ISO timestamps.
+See "Parsing the log" in the README for the log format and what each
+column means.
 """
 
-import re
-from datetime import datetime
+from __future__ import annotations
+
+import argparse
+import warnings
+from datetime import datetime, timezone
 
 import pandas as pd
 
+COLUMNS = [
+    "log_time",
+    "event_type",
+    "id",
+    "name",
+    "device_type",
+    "status",
+    "location",
+    "serial_number",
+    "power",
+    "event_subtype",
+    "effective_time",
+    "start_time",
+    "start_earliest",
+    "start_latest",
+    "stop_time",
+    "stop_earliest",
+    "stop_latest",
+    "note",
+    "tracking_state",
+]
+
+TIME_COLUMNS = [
+    "log_time",
+    "effective_time",
+    "start_time",
+    "start_earliest",
+    "start_latest",
+    "stop_time",
+    "stop_earliest",
+    "stop_latest",
+]
+
+# key=value fields on DEVICE_* entries and the column each one fills
+_DEVICE_FIELDS = {
+    "name": "name",
+    "type": "device_type",
+    "status": "status",
+    "location": "location",
+    "sn": "serial_number",
+    "power": "power",
+}
+
 
 def _parse_timestamp(ts_str: str) -> datetime:
-    """Parse ISO 8601 timestamp with timezone offset.
+    """Parse an ISO 8601 timestamp with a UTC offset.
 
-    Handles both '+HH:MM' offsets and 'Z' suffix (UTC) for Python <3.11
-    compatibility.
+    Accepts a 'Z' suffix too, which Python < 3.11 cannot parse natively.
     """
-    # Python <3.11 doesn't support 'Z' suffix in fromisoformat
     if ts_str.endswith("Z"):
         ts_str = ts_str[:-1] + "+00:00"
     return datetime.fromisoformat(ts_str)
 
 
-def _parse_quoted_string(s: str) -> str:
-    """Extract value from quoted string like name="My Watch"."""
-    match = re.search(r'"([^"]*)"', s)
-    return match.group(1) if match else s
+def _unquote(value: str) -> str:
+    """Strip one pair of surrounding double quotes: '"My Watch"' -> 'My Watch'."""
+    if len(value) >= 2 and value[0] == value[-1] == '"':
+        return value[1:-1]
+    return value
 
 
-def _parse_key_value(field: str) -> tuple[str, str]:
-    """Parse key=value pair, handling quoted values."""
-    if "=" not in field:
-        return (field, field)
-    key, value = field.split("=", 1)
-    if value.startswith('"') and value.endswith('"'):
-        value = value[1:-1]
-    return (key, value)
-
-
-def _parse_single_time_window(fields: list[str]) -> dict:
-    """
-    Parse a single time window from fields.
-
-    Used for EVENT_STARTED which only has a start window.
-    Returns dict with keys: start_time, start_earliest, start_latest
-    """
-    result = {"start_time": None, "start_earliest": None, "start_latest": None}
-
-    for field in fields:
-        if field.startswith("earliest="):
-            result["start_earliest"] = _parse_timestamp(field.split("=", 1)[1])
-        elif field.startswith("latest="):
-            result["start_latest"] = _parse_timestamp(field.split("=", 1)[1])
-        elif field and "=" not in field:
-            # Single backdated timestamp (not a key=value pair)
-            try:
-                result["start_time"] = _parse_timestamp(field)
-            except ValueError:
-                pass  # Not a timestamp, skip
-
-    return result
-
-
-def _parse_dual_time_windows(fields: list[str]) -> dict:
-    """
-    Parse start and stop time windows from fields.
-
-    Used for EVENT_STOPPED and EVENT_RETROACTIVE which can have both
-    start and stop windows. The log format emits start window first,
-    then stop window.
-
-    Possible formats:
-    - No windows: []
-    - Start only (backdated): [timestamp]
-    - Start only (window): [earliest=..., latest=...]
-    - Start + stop (backdated): [start_ts, stop_ts]
-    - Start + stop (windows): [earliest=..., latest=..., earliest=..., latest=...]
-    - Mixed: [start_ts, earliest=..., latest=...] or [earliest=..., latest=..., stop_ts]
-
-    Returns dict with keys: start_time, start_earliest, start_latest,
-                           stop_time, stop_earliest, stop_latest
-    """
-    result = {
-        "start_time": None,
-        "start_earliest": None,
-        "start_latest": None,
-        "stop_time": None,
-        "stop_earliest": None,
-        "stop_latest": None,
-    }
-
-    # Track which earliest/latest we've seen to distinguish start vs stop
-    seen_start_window = False
-    bare_timestamps = []
-
-    for field in fields:
-        if field.startswith("earliest="):
-            ts = _parse_timestamp(field.split("=", 1)[1])
-            if not seen_start_window and result["start_earliest"] is None:
-                result["start_earliest"] = ts
-            else:
-                result["stop_earliest"] = ts
-        elif field.startswith("latest="):
-            ts = _parse_timestamp(field.split("=", 1)[1])
-            if not seen_start_window and result["start_latest"] is None:
-                result["start_latest"] = ts
-                seen_start_window = True  # Mark that we've completed a start window
-            else:
-                result["stop_latest"] = ts
-        elif field and "=" not in field:
-            # Bare timestamp - collect them in order
-            try:
-                bare_timestamps.append(_parse_timestamp(field))
-            except ValueError:
-                pass  # Not a timestamp, skip
-
-    # Assign bare timestamps: first is start, second is stop
-    if len(bare_timestamps) >= 1:
-        result["start_time"] = bare_timestamps[0]
-    if len(bare_timestamps) >= 2:
-        result["stop_time"] = bare_timestamps[1]
-
-    return result
-
-
-def _parse_device_added(fields: list[str]) -> dict:
-    """Parse DEVICE_ADDED entry fields."""
+def _parse_device_fields(fields: list[str]) -> dict:
+    """Parse key=value fields from DEVICE_ADDED and DEVICE_UPDATED entries."""
     result = {}
-    for field in fields[3:]:  # Skip timestamp, event_type, id
-        key, value = _parse_key_value(field)
-        if key == "name":
-            result["name"] = _parse_quoted_string(field)
-        elif key == "type":
-            result["device_type"] = value
-        elif key == "status":
-            result["status"] = value
-        elif key == "location":
-            result["location"] = value
-        elif key == "sn":
-            result["serial_number"] = None if value == "none" else value
-        elif key == "power":
-            result["power"] = value
-    return result
-
-
-def _parse_device_updated(fields: list[str]) -> dict:
-    """Parse DEVICE_UPDATED entry fields."""
-    result = {"name": _parse_quoted_string(fields[3])}  # Old name in quotes
-
-    for field in fields[4:]:  # Changes after old name
-        key, value = _parse_key_value(field)
-        if key == "name":
-            result["name"] = _parse_quoted_string(field)  # New name
-        elif key == "type":
-            result["device_type"] = value
-        elif key == "status":
-            result["status"] = value
-        elif key == "location":
-            result["location"] = value
-        elif key == "sn":
-            result["serial_number"] = None if value == "none" else value
-        elif key == "power":
-            result["power"] = value
+    for field in fields:
+        key, sep, value = field.partition("=")
+        if not sep:
+            continue
+        if key in _DEVICE_FIELDS:
+            value = _unquote(value)
+            if key == "sn" and value == "none":
+                value = None
+            result[_DEVICE_FIELDS[key]] = value
         elif key == "effective":
             result["effective_time"] = _parse_timestamp(value)
     return result
 
 
-def parse_log(filepath: str) -> pd.DataFrame:
+def _parse_time_specs(fields: list[str]) -> list[tuple]:
+    """Split the trailing fields of an EVENT_* entry into time specs, in order.
+
+    A spec is either a bare timestamp (a precise backdated time) or an
+    earliest=/latest= pair (an uncertainty window). Specs are positional:
+    the first is the start and the second, if present, is the stop.
+
+    Returns a list of (time, earliest, latest) tuples.
     """
-    Parse a Worn app log file into a pandas DataFrame.
+    specs = []
+    for field in fields:
+        if field.startswith("earliest="):
+            specs.append([None, _parse_timestamp(field[len("earliest=") :]), None])
+        elif field.startswith("latest="):
+            latest = _parse_timestamp(field[len("latest=") :])
+            if specs and specs[-1][1] is not None and specs[-1][2] is None:
+                specs[-1][2] = latest  # closes the window opened by earliest=
+            else:
+                specs.append([None, None, latest])
+        elif field:
+            try:
+                specs.append([_parse_timestamp(field), None, None])
+            except ValueError:
+                continue  # not a timestamp; ignore
+    return [tuple(spec) for spec in specs]
+
+
+def _time_columns(specs: list[tuple], prefixes: list[str]) -> dict:
+    """Map positional time specs onto start_*/stop_* columns."""
+    result = {}
+    for prefix, (time, earliest, latest) in zip(prefixes, specs):
+        result[f"{prefix}_time"] = time
+        result[f"{prefix}_earliest"] = earliest
+        result[f"{prefix}_latest"] = latest
+    return result
+
+
+def _parse_line(fields: list[str]) -> dict:
+    """Parse one tab-split log line into a row dict."""
+    row = dict.fromkeys(COLUMNS)
+    row["log_time"] = _parse_timestamp(fields[0])
+    row["event_type"] = entry = fields[1]
+    rest = fields[2:]
+
+    if entry == "DEVICE_ADDED":
+        row["id"] = rest[0]
+        row.update(_parse_device_fields(rest[1:]))
+
+    elif entry == "DEVICE_UPDATED":
+        # id, "old name", then only the fields that changed
+        row["id"] = rest[0]
+        row["name"] = _unquote(rest[1])
+        row.update(_parse_device_fields(rest[2:]))
+
+    elif entry == "DEVICE_DELETED":
+        row["id"] = rest[0]
+        row["name"] = _unquote(rest[1])
+
+    elif entry in ("DEVICE_NOTE", "ACTIVITY_NOTE"):
+        row["id"] = rest[0]
+        row["name"] = rest[1]
+        row["note"] = rest[2] if len(rest) > 2 else None
+
+    elif entry == "GLOBAL_NOTE":
+        row["note"] = rest[0] if rest else None
+
+    elif entry in ("EVENT_STARTED", "EVENT_STOPPED", "EVENT_RETROACTIVE"):
+        row["id"] = rest[0]
+        row["event_subtype"] = rest[1]
+        prefixes = ["start"] if entry == "EVENT_STARTED" else ["start", "stop"]
+        row.update(_time_columns(_parse_time_specs(rest[2:]), prefixes))
+
+    elif entry == "EVENT_CANCELLED":
+        row["id"] = rest[0]
+        row["event_subtype"] = rest[1]
+
+    elif entry == "GLOBAL_TRACKING":
+        row["tracking_state"] = rest[0]
+
+    return row
+
+
+def _target_timezone(log_times: list[datetime]):
+    """Pick one time zone for every time column when the caller gave none.
+
+    Uses the log's own UTC offset if it never changes. If it does (a DST
+    change, travel), falls back to UTC and warns.
+    """
+    offsets = {t.utcoffset() for t in log_times}
+    if len(offsets) == 1 and None not in offsets:
+        return timezone(offsets.pop())
+    if len(offsets) > 1:
+        warnings.warn(
+            "Log contains more than one UTC offset (e.g., a daylight saving "
+            "change or travel), so all times were converted to UTC. Pass "
+            "tz='America/Chicago' (or your zone) to get local times instead.",
+            stacklevel=3,
+        )
+    return timezone.utc
+
+
+def parse_log(filepath: str, tz: str | None = None) -> pd.DataFrame:
+    """
+    Parse a Worn log export into a DataFrame with one row per log entry.
 
     Args:
-        filepath: Path to the exported log file
+        filepath: Path to the exported log file.
+        tz: Time zone for all time columns, e.g. "UTC" or "America/Chicago".
+            By default, times keep the log's own UTC offset. If that offset
+            changes within the log (a DST change, travel), times are converted
+            to UTC and a warning is issued.
 
     Returns:
-        DataFrame with columns:
-        - log_time: When the log entry was recorded
-        - event_type: DEVICE_ADDED, EVENT_STARTED, etc.
-        - id: Device or event UUID (NaN for GLOBAL_* events)
-        - name: Device/event name where applicable
-        - device_type: For DEVICE_* events
-        - status: For DEVICE_* events
-        - location: For DEVICE_* events
-        - serial_number: For DEVICE_* events
-        - power: on/off for DEVICE_* events
-        - event_subtype: For EVENT_* (walk, run, inBed, etc.)
-        - effective_time: Backdated time for DEVICE_UPDATED
-        - start_time: Backdated start time for EVENT_*
-        - start_earliest: Start of start uncertainty window
-        - start_latest: End of start uncertainty window
-        - stop_time: Backdated stop time for EVENT_STOPPED/RETROACTIVE
-        - stop_earliest: Start of stop uncertainty window
-        - stop_latest: End of stop uncertainty window
-        - note: For *_NOTE events
-        - tracking_state: For GLOBAL_TRACKING (on/off)
+        DataFrame with these columns (empty where they don't apply):
+        - log_time: When the entry was written
+        - event_type: Entry type (DEVICE_ADDED, EVENT_STARTED, ...)
+        - id: Device or event UUID
+        - name: Device name (DEVICE_*), or event name (ACTIVITY_NOTE)
+        - device_type, status, location, serial_number, power: Device
+          properties (DEVICE_UPDATED only fills the ones that changed)
+        - event_subtype: Event type for EVENT_* (walk, run, inBed, ...)
+        - effective_time: Backdated time of a DEVICE_UPDATED change
+        - start_time / stop_time: Precise backdated start / stop time
+        - start_earliest, start_latest / stop_earliest, stop_latest:
+          Uncertainty window around the start / stop time
+        - note: Note text for *_NOTE entries
+        - tracking_state: on/off for GLOBAL_TRACKING
+
+        All time columns are timezone-aware datetimes. An EVENT_* row with
+        no start (or stop) time means it happened at log_time.
     """
     rows = []
-
     with open(filepath, "r", encoding="utf-8") as f:
-        for line in f:
-            line = line.rstrip("\n\r")
-            if not line:
-                continue
-
-            fields = line.split("\t")
+        for line_number, line in enumerate(f, start=1):
+            fields = line.rstrip("\r\n").split("\t")
             if len(fields) < 2:
-                continue
+                continue  # blank or malformed line
+            try:
+                rows.append(_parse_line(fields))
+            except (ValueError, IndexError) as e:
+                raise ValueError(
+                    f"{filepath}, line {line_number}: can't parse {line.strip()!r} ({e})"
+                ) from e
 
-            row = {
-                "log_time": _parse_timestamp(fields[0]),
-                "event_type": fields[1],
-                "id": None,
-                "name": None,
-                "device_type": None,
-                "status": None,
-                "location": None,
-                "serial_number": None,
-                "power": None,
-                "event_subtype": None,
-                "effective_time": None,
-                "start_time": None,
-                "start_earliest": None,
-                "start_latest": None,
-                "stop_time": None,
-                "stop_earliest": None,
-                "stop_latest": None,
-                "note": None,
-                "tracking_state": None,
-            }
+    df = pd.DataFrame(rows, columns=COLUMNS)
+    if tz is None:
+        tz = _target_timezone(list(df["log_time"]))
+    for col in TIME_COLUMNS:
+        df[col] = pd.to_datetime(df[col], utc=True).dt.tz_convert(tz)
+    return df
 
-            event_type = fields[1]
 
-            if event_type == "DEVICE_ADDED":
-                row["id"] = fields[2]
-                row.update(_parse_device_added(fields))
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Parse a Worn log export and print a summary."
+    )
+    parser.add_argument("log_file", help="exported log file (e.g. worn_log.txt)")
+    parser.add_argument(
+        "--tz",
+        help="convert all times to this zone, e.g. UTC or America/Chicago",
+    )
+    parser.add_argument(
+        "--csv", metavar="PATH", help="also write the parsed table to a CSV file"
+    )
+    args = parser.parse_args(argv)
 
-            elif event_type == "DEVICE_UPDATED":
-                row["id"] = fields[2]
-                row.update(_parse_device_updated(fields))
+    df = parse_log(args.log_file, tz=args.tz)
+    print(f"Parsed {len(df)} log entries")
+    if len(df):
+        print(f"From {df['log_time'].min()} to {df['log_time'].max()}")
+        print("\nEntries by type:")
+        for entry_type, count in df["event_type"].value_counts().items():
+            print(f"  {entry_type:<20}{count}")
 
-            elif event_type == "DEVICE_DELETED":
-                row["id"] = fields[2]
-                row["name"] = _parse_quoted_string(fields[3])
-
-            elif event_type == "DEVICE_NOTE":
-                row["id"] = fields[2]
-                row["name"] = fields[3]
-                row["note"] = fields[4] if len(fields) > 4 else None
-
-            elif event_type == "ACTIVITY_NOTE":
-                row["id"] = fields[2]
-                row["name"] = fields[3]
-                row["note"] = fields[4] if len(fields) > 4 else None
-
-            elif event_type == "GLOBAL_NOTE":
-                row["note"] = fields[2] if len(fields) > 2 else None
-
-            elif event_type == "EVENT_STARTED":
-                row["id"] = fields[2]
-                row["event_subtype"] = fields[3]
-                time_window = _parse_single_time_window(fields[4:])
-                row.update(time_window)
-
-            elif event_type == "EVENT_STOPPED":
-                row["id"] = fields[2]
-                row["event_subtype"] = fields[3]
-                time_windows = _parse_dual_time_windows(fields[4:])
-                row.update(time_windows)
-
-            elif event_type == "EVENT_CANCELLED":
-                row["id"] = fields[2]
-                row["event_subtype"] = fields[3]
-
-            elif event_type == "EVENT_RETROACTIVE":
-                row["id"] = fields[2]
-                row["event_subtype"] = fields[3]
-                time_windows = _parse_dual_time_windows(fields[4:])
-                row.update(time_windows)
-
-            elif event_type == "GLOBAL_TRACKING":
-                row["tracking_state"] = fields[2]
-
-            rows.append(row)
-
-    return pd.DataFrame(rows)
+    if args.csv:
+        df.to_csv(args.csv, index=False)
+        print(f"\nWrote {args.csv}")
 
 
 if __name__ == "__main__":
-    import sys
-
-    if len(sys.argv) < 2:
-        print("Usage: python parse_log.py <log_file>")
-        sys.exit(1)
-
-    df = parse_log(sys.argv[1])
-    print(f"Parsed {len(df)} log entries")
-    print("\nColumns:", list(df.columns))
-    print("\nEvent type counts:")
-    print(df["event_type"].value_counts())
-    print("\nSample rows:")
-    print(df.head(10).to_string())
+    main()

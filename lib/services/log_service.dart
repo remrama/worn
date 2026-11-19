@@ -92,7 +92,7 @@ class LogService {
 
     // Add effective timestamp if backdated
     if (effectiveTime != null) {
-      changes.add('effective=${effectiveTime.toUtc().toIso8601String()}');
+      changes.add('effective=${_formatDateTime(effectiveTime)}');
     }
 
     await _append(
@@ -121,14 +121,19 @@ class LogService {
 
   /// Formats a time window for logging.
   /// - Returns null if earliest == latest AND within 60 seconds of logTime (use log timestamp)
+  ///   unless [alwaysInclude] is set
   /// - Returns single timestamp if earliest == latest but backdated
   /// - Returns 'earliest=...\tlatest=...' if there's a window
   String? _formatTimeWindow(
-      DateTime earliest, DateTime latest, DateTime logTime) {
+    DateTime earliest,
+    DateTime latest,
+    DateTime logTime, {
+    bool alwaysInclude = false,
+  }) {
     if (earliest == latest) {
       // Check if it's close to "now" (within 60 seconds of log time)
       final diff = logTime.difference(earliest).abs();
-      if (diff.inSeconds <= 60) {
+      if (diff.inSeconds <= 60 && !alwaysInclude) {
         // Close to now - use log timestamp as event time
         return null;
       }
@@ -159,13 +164,31 @@ class LogService {
     DateTime stopEarliest,
     DateTime stopLatest,
   ) async {
+    await _appendStartStop('EVENT_STOPPED', event, stopEarliest, stopLatest);
+  }
+
+  /// Appends an entry carrying both a start and a stop time.
+  ///
+  /// Times are positional: the start comes first, then the stop. Whenever a
+  /// stop time is written the start time is written too, so a lone time on
+  /// the line is always the start and parsers never have to guess.
+  Future<void> _appendStartStop(
+    String entryType,
+    Event event,
+    DateTime stopEarliest,
+    DateTime stopLatest,
+  ) async {
     final now = DateTime.now();
-    final startWindow =
-        _formatTimeWindow(event.startEarliest, event.startLatest, now);
     final stopWindow = _formatTimeWindow(stopEarliest, stopLatest, now);
+    final startWindow = _formatTimeWindow(
+      event.startEarliest,
+      event.startLatest,
+      now,
+      alwaysInclude: stopWindow != null,
+    );
     final parts = [
       _formatDateTime(now),
-      'EVENT_STOPPED',
+      entryType,
       event.id,
       event.type.name,
     ];
@@ -189,23 +212,8 @@ class LogService {
     DateTime stopEarliest,
     DateTime stopLatest,
   ) async {
-    final now = DateTime.now();
-    final startWindow =
-        _formatTimeWindow(event.startEarliest, event.startLatest, now);
-    final stopWindow = _formatTimeWindow(stopEarliest, stopLatest, now);
-    final parts = [
-      _formatDateTime(now),
-      'EVENT_RETROACTIVE',
-      event.id,
-      event.type.name,
-    ];
-    if (startWindow != null) {
-      parts.add(startWindow);
-    }
-    if (stopWindow != null) {
-      parts.add(stopWindow);
-    }
-    await _append(parts.join('\t'));
+    await _appendStartStop(
+        'EVENT_RETROACTIVE', event, stopEarliest, stopLatest);
   }
 
   Future<List<String>> getLogLines() async {

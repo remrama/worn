@@ -58,7 +58,7 @@ dart run flutter_launcher_icons
 
 ## CI/CD Workflows
 
-- **test.yml**: Runs tests and analyze on all pushes to main and PRs (fast gate)
+- **test.yml**: Runs Flutter tests and analyze, plus the Python log parser tests, on all pushes to main and PRs (fast gate)
 - **build-android.yml**: Development APK builds on pushes to main
 - **deploy-web-preview.yml**: Web preview deployments for all PRs to main
 - **release.yml**: Production release pipeline triggered by version tags (v*.*.*)
@@ -135,22 +135,30 @@ Uses `SharedPreferences` with these keys:
 
 ## Log Format
 
-Tab-separated entries with ISO 8601 timestamps including timezone offset (e.g., `-05:00`). Event times are handled as follows:
+Tab-separated entries. Every timestamp (log time, event times, `effective=`) is ISO 8601 local time with UTC offset (e.g., `-05:00`). Event times are handled as follows:
 - **Current time** (within 60s of log time): No separate timestamp (log entry timestamp IS the event time)
 - **Backdated precise time**: Single timestamp appended
 - **Time window** (uncertainty): `earliest=` and `latest=` key=value pairs appended
+
+Event times are positional: start first, then stop. `EVENT_STOPPED` and `EVENT_RETROACTIVE` always write the start time when they write a stop time, so a lone time is always the start. `DEVICE_UPDATED` writes only changed fields, plus `effective=` when backdated.
+
+The README's "Log Format" and "Parsing the Log" sections are the user-facing spec, and `scripts/parse_log.py` parses it. Keep all three in sync with `LogService` when the format changes.
 
 Uses internal variable names for parsing efficiency:
 ```
 2024-01-15T10:30:00.000-05:00	DEVICE_ADDED	uuid	name="MyWatch"	type=watch	status=loose	location=leftWrist	sn=SN123	power=on
 2024-01-15T10:32:00.000-05:00	DEVICE_UPDATED	uuid	"MyWatch"	name="My Watch Renamed"	type=wristband	sn=SN456	status=worn	location=rightWrist	power=off
 2024-01-15T10:45:00.000-05:00	DEVICE_UPDATED	uuid	"My Watch Renamed"	status=loose
+2024-01-15T10:50:00.000-05:00	DEVICE_UPDATED	uuid	"My Watch Renamed"	status=worn	effective=2024-01-15T10:40:00.000-05:00
 2024-01-15T11:00:00.000-05:00	EVENT_STARTED	uuid	walk
-2024-01-15T11:05:00.000-05:00	EVENT_STARTED	uuid	run	earliest=2024-01-15T11:00:00.000-05:00	latest=2024-01-15T11:05:00.000-05:00
+2024-01-15T11:05:00.000-05:00	EVENT_STARTED	uuid	run	earliest=2024-01-15T10:55:00.000-05:00	latest=2024-01-15T11:00:00.000-05:00
 2024-01-15T11:10:00.000-05:00	EVENT_STARTED	uuid	workout	2024-01-15T10:45:00.000-05:00
-2024-01-15T11:30:00.000-05:00	EVENT_STOPPED	uuid	walk
-2024-01-15T11:35:00.000-05:00	EVENT_STOPPED	uuid	run	earliest=2024-01-15T11:30:00.000-05:00	latest=2024-01-15T11:35:00.000-05:00
+2024-01-15T11:30:00.000-05:00	EVENT_STOPPED	uuid	walk	2024-01-15T11:00:00.000-05:00
+2024-01-15T11:35:00.000-05:00	EVENT_STOPPED	uuid	run	earliest=2024-01-15T10:55:00.000-05:00	latest=2024-01-15T11:00:00.000-05:00	earliest=2024-01-15T11:30:00.000-05:00	latest=2024-01-15T11:35:00.000-05:00
+2024-01-15T11:36:00.000-05:00	EVENT_STARTED	uuid	swim
 2024-01-15T11:40:00.000-05:00	EVENT_CANCELLED	uuid	swim
+2024-01-15T11:45:00.000-05:00	EVENT_RETROACTIVE	uuid	inBed	2024-01-14T22:00:00.000-05:00	2024-01-15T06:00:00.000-05:00
+2024-01-15T11:50:00.000-05:00	DEVICE_DELETED	uuid	"My Watch Renamed"
 2024-01-15T12:00:00.000-05:00	GLOBAL_NOTE	User added a custom note
 2024-01-15T12:05:00.000-05:00	DEVICE_NOTE	uuid	MyWatch	Device-specific note
 2024-01-15T12:10:00.000-05:00	ACTIVITY_NOTE	eventId	Walk	Event-specific note
@@ -165,4 +173,6 @@ Uses internal variable names for parsing efficiency:
 - Unit tests in `test/event_test.dart` for Event model
 - Unit tests in `test/event_template_test.dart` for EventTemplate model
 - Widget tests in `test/widget_test.dart` for navigation UI
+- Log format tests in `test/log_service_test.dart`
+- Python parser tests in `scripts/test_parse_log.py`: `uv run --with-requirements scripts/requirements.txt pytest scripts`
 - Widget tests in `test/device_type_icon_test.dart` for device type icon sizing

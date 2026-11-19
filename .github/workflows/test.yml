@@ -28,3 +28,15 @@ jobs:
 
       - name: Run tests
         run: flutter test
+
+  parser:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v10.3.3
+
+      - name: Run log parser tests
+        run: uv run --with-requirements scripts/requirements.txt pytest scripts

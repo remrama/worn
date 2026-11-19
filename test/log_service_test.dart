@@ -198,7 +198,12 @@ void main() {
       final logLine = logLines.first;
       expect(logLine, contains('DEVICE_UPDATED'));
       expect(logLine, contains('status=worn'));
-      expect(logLine, contains('effective=2024-01-15T10:30:00.000Z'));
+      // Like every other timestamp, effective time is local with an offset
+      final effectiveField =
+          logLine.split('\t').firstWhere((f) => f.startsWith('effective='));
+      final value = effectiveField.substring('effective='.length);
+      expect(value, matches(RegExp(r'[+-]\d{2}:\d{2}$')));
+      expect(DateTime.parse(value).isAtSameMomentAs(effectiveTime), isTrue);
     });
 
     test('logDeviceUpdated effective field appears after status change',
@@ -330,6 +335,124 @@ void main() {
       // Stop time should have earliest=/latest= since they differ
       expect(logLine, contains('earliest='));
       expect(logLine, contains('latest='));
+    });
+
+    test('logEventStopped writes start before stop', () async {
+      final service = LogService.instance;
+      final event = Event(
+        id: 'test-id',
+        type: EventType.run,
+        startEarliest: DateTime.utc(2024, 1, 15, 10, 0),
+        startLatest: DateTime.utc(2024, 1, 15, 10, 0),
+      );
+
+      await service.logEventStopped(
+        event,
+        DateTime.utc(2024, 1, 15, 11, 0),
+        DateTime.utc(2024, 1, 15, 11, 15),
+      );
+
+      final fields = (await service.getLogLines()).first.split('\t');
+      // timestamp, EVENT_STOPPED, id, type, start, stop earliest, stop latest
+      expect(fields.length, 7);
+      expect(
+          DateTime.parse(fields[4])
+              .isAtSameMomentAs(DateTime.utc(2024, 1, 15, 10, 0)),
+          isTrue);
+      expect(fields[5], startsWith('earliest='));
+      expect(fields[6], startsWith('latest='));
+    });
+
+    test('logEventStopped omits both times when start and stop are now',
+        () async {
+      final service = LogService.instance;
+      final now = DateTime.now().toUtc();
+      final event = Event(
+        id: 'test-id',
+        type: EventType.walk,
+        startEarliest: now,
+        startLatest: now,
+      );
+
+      await service.logEventStopped(event, now, now);
+
+      final logLine = (await service.getLogLines()).first;
+      expect(logLine, endsWith('\twalk'));
+    });
+
+    test(
+        'logEventStopped writes start near now when a stop time is written, '
+        'so a lone time is always the start', () async {
+      final service = LogService.instance;
+      final now = DateTime.now().toUtc();
+      final event = Event(
+        id: 'test-id',
+        type: EventType.walk,
+        startEarliest: now,
+        startLatest: now,
+      );
+
+      await service.logEventStopped(
+        event,
+        now,
+        now.add(const Duration(seconds: 30)),
+      );
+
+      final fields = (await service.getLogLines()).first.split('\t');
+      // timestamp, EVENT_STOPPED, id, type, start, stop earliest, stop latest
+      expect(fields.length, 7);
+      expect(DateTime.parse(fields[4]).isAtSameMomentAs(now), isTrue);
+      expect(fields[5], startsWith('earliest='));
+      expect(fields[6], startsWith('latest='));
+    });
+
+    test(
+        'logEventStopped with a backdated start and stop now writes start only',
+        () async {
+      final service = LogService.instance;
+      final now = DateTime.now().toUtc();
+      final start = now.subtract(const Duration(minutes: 30));
+      final event = Event(
+        id: 'test-id',
+        type: EventType.walk,
+        startEarliest: start,
+        startLatest: start,
+      );
+
+      await service.logEventStopped(event, now, now);
+
+      final fields = (await service.getLogLines()).first.split('\t');
+      // timestamp, EVENT_STOPPED, id, type, start
+      expect(fields.length, 5);
+      expect(DateTime.parse(fields[4]).isAtSameMomentAs(start), isTrue);
+    });
+
+    test('logRetroactiveEvent writes start then stop', () async {
+      final service = LogService.instance;
+      final event = Event(
+        id: 'test-id',
+        type: EventType.inBed,
+        startEarliest: DateTime.utc(2024, 1, 14, 22, 0),
+        startLatest: DateTime.utc(2024, 1, 14, 22, 30),
+      );
+
+      await service.logRetroactiveEvent(
+        event,
+        DateTime.utc(2024, 1, 15, 6, 0),
+        DateTime.utc(2024, 1, 15, 6, 0),
+      );
+
+      final fields = (await service.getLogLines()).first.split('\t');
+      // timestamp, EVENT_RETROACTIVE, id, type, start earliest, start latest,
+      // stop
+      expect(fields.length, 7);
+      expect(fields[1], 'EVENT_RETROACTIVE');
+      expect(fields[4], startsWith('earliest='));
+      expect(fields[5], startsWith('latest='));
+      expect(
+          DateTime.parse(fields[6])
+              .isAtSameMomentAs(DateTime.utc(2024, 1, 15, 6, 0)),
+          isTrue);
     });
   });
 
